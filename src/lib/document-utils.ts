@@ -31,24 +31,35 @@ export async function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
  * Simple PDF text extraction
  * Note: This is a basic implementation. For production, consider using pdf.js
  */
+const MAX_PDF_SIZE = 5 * 1024 * 1024; // 5 MB safety limit for regex processing
+
 export async function extractTextFromPDF(file: File): Promise<string> {
   try {
     const arrayBuffer = await readFileAsArrayBuffer(file);
     const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Convert to string
-    let text = '';
-    for (let i = 0; i < uint8Array.length; i++) {
-      text += String.fromCharCode(uint8Array[i]);
+
+    // Safety: reject files too large for in-browser regex processing
+    if (uint8Array.length > MAX_PDF_SIZE) {
+      return `PDF is too large for browser-based extraction (${(uint8Array.length / 1024 / 1024).toFixed(1)} MB). Max supported: 5 MB. Please use a smaller file or a plain-text export.`;
     }
 
-    // Extract text between BT and ET tags (PDF text objects)
+    // Use TextDecoder instead of byte-by-byte string concatenation (avoids stack overflow)
+    const decoder = new TextDecoder('latin1');
+    const text = decoder.decode(uint8Array);
+
+    // Extract text between parentheses (PDF text objects)
     const textMatches = text.match(/\(([^)]+)\)/g);
     
     if (!textMatches) {
-      // Fallback: try to extract any ASCII text
-      const asciiText = text.replace(/[^\x20-\x7E\n]/g, '');
-      return asciiText.replace(/\s+/g, ' ').trim();
+      // Fallback: extract printable ASCII characters only
+      // Process in chunks to avoid regex stack overflow on large binary data
+      let asciiText = '';
+      const CHUNK = 50000;
+      for (let i = 0; i < text.length; i += CHUNK) {
+        const slice = text.slice(i, i + CHUNK);
+        asciiText += slice.replace(/[^\x20-\x7E\n]/g, '');
+      }
+      return asciiText.replace(/\s+/g, ' ').trim() || 'Unable to extract text from PDF. The PDF might be image-based or encrypted.';
     }
 
     const extractedText = textMatches
@@ -70,11 +81,18 @@ export async function extractTextFromPDF(file: File): Promise<string> {
 export async function extractTextFromDOCX(file: File): Promise<string> {
   try {
     const text = await readFileAsText(file);
-    // Remove XML tags
-    const cleanText = text
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+
+    // Safety: limit the size we run regex on
+    const safeText = text.length > MAX_PDF_SIZE ? text.slice(0, MAX_PDF_SIZE) : text;
+
+    // Remove XML tags — process in chunks to prevent regex stack overflow
+    let cleanText = '';
+    const CHUNK = 50000;
+    for (let i = 0; i < safeText.length; i += CHUNK) {
+      const slice = safeText.slice(i, i + CHUNK);
+      cleanText += slice.replace(/<[^>]*>/g, ' ');
+    }
+    cleanText = cleanText.replace(/\s+/g, ' ').trim();
     return cleanText || 'Unable to extract text from DOCX file.';
   } catch (error) {
     console.error('DOCX extraction error:', error);

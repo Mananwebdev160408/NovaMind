@@ -1,10 +1,6 @@
-/**
- * Module 4: Private Document Research Assistant
- */
-
 import { useState, useEffect } from 'react';
-import { generateText, ensureLLMLoaded, chunkText, generateId } from '../lib/ai-utils';
-import { create, getAll, deleteItem, STORES } from '../lib/storage';
+import { ensureLLMLoaded, chunkText, generateId, generateText } from '../lib/ai-utils';
+import { create, getAll, STORES } from '../lib/storage';
 import { extractTextFromDocument, isValidDocumentType, formatFileSize } from '../lib/document-utils';
 import type { ResearchDocument, DocumentQA } from '../types';
 
@@ -24,7 +20,18 @@ export function DocumentResearch() {
 
   async function loadDocuments() {
     const docs = await getAll<ResearchDocument>(STORES.DOCUMENTS);
-    setDocuments(docs.sort((a, b) => b.uploadedAt - a.uploadedAt));
+    
+    // Sanity check: Filter out or repair corrupted documents (likely from the previous infinite loop bug)
+    const sanitizedDocs = docs.map(doc => {
+      // If a document has an absurd number of chunks (e.g., > 2000 for a typical file), truncate it
+      if (doc.chunks && doc.chunks.length > 2000) {
+        console.warn(`Repairing corrupted document: ${doc.name}`);
+        return { ...doc, chunks: doc.chunks.slice(0, 500) };
+      }
+      return doc;
+    });
+
+    setDocuments(sanitizedDocs.sort((a, b) => b.uploadedAt - a.uploadedAt));
   }
 
   async function loadQAHistory() {
@@ -63,25 +70,21 @@ export function DocumentResearch() {
       loadDocuments();
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Error uploading document');
     } finally {
       setIsUploading(false);
     }
   }
 
   async function askQuestion() {
-    if (!question.trim() || selectedDocs.size === 0) {
-      alert('Please select documents and enter a question');
-      return;
-    }
+    if (!question.trim() || selectedDocs.size === 0) return;
 
     setIsProcessing(true);
     try {
       const selectedDocuments = documents.filter((d) => selectedDocs.has(d.id));
       const combinedContent = selectedDocuments.map((d) => `Document: ${d.name}\n\n${d.content}`).join('\n\n---\n\n');
-      const context = combinedContent.slice(0, 3000); // Limit context size
+      const context = combinedContent.slice(0, 3000);
 
-      const prompt = `Based on the following documents, answer this question:\n\nQuestion: ${question}\n\nDocuments:\n${context}\n\nProvide a detailed answer with references to specific documents.`;
+      const prompt = `Based on the following documents, answer this question:\n\nQuestion: ${question}\n\nDocuments:\n${context}\n\nProvide a detailed answer.`;
       const result = await generateText(prompt, { maxTokens: 600, temperature: 0.3 });
 
       const qa: DocumentQA = {
@@ -98,114 +101,155 @@ export function DocumentResearch() {
       setQuestion('');
     } catch (error) {
       console.error('Q&A error:', error);
-      alert('Error generating answer');
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  async function summarizeDocument(doc: ResearchDocument) {
-    setIsProcessing(true);
-    try {
-      const result = await generateText(
-        `Summarize this document in 5-7 sentences covering the key points:\n\n${doc.content.slice(0, 2000)}`,
-        { maxTokens: 300, temperature: 0.5 }
-      );
-      await create(STORES.DOCUMENTS, { ...doc, summary: result.text });
-      loadDocuments();
     } finally {
       setIsProcessing(false);
     }
   }
 
   return (
-    <div className="module-container">
-      <div className="module-header">
-        <h2>📄 Document Research</h2>
-        <p>Private document analysis with Q&A - files never leave your browser</p>
-      </div>
+    <div className="notes-v2-container">
+      {/* Pane 1: Left Navigation Sidebar */}
+      <aside className="writing-nav-sidebar" style={{ position: 'relative', height: '100%', width: '260px', minWidth: '260px' }}>
+        <div className="spectral-branding">
+          <div className="spectral-logo">🧠</div>
+          <div className="spectral-info">
+            <h3>SPECTRAL ENGINE</h3>
+            <span className="ai-status-badge"><span style={{ color: '#ff5500' }}>●</span> AI Processing Active</span>
+          </div>
+        </div>
 
-      <div className="module-toolbar">
-        <label className="btn">
-          📤 Upload Documents
-          <input type="file" multiple accept=".pdf,.txt,.doc,.docx,.md" onChange={handleFileUpload} style={{ display: 'none' }} />
+        <label className="btn-new-draft" style={{ marginTop: '24px', cursor: 'pointer', textAlign: 'center', display: 'block' }}>
+          {isUploading ? 'Uploading...' : '+ Upload Documents'}
+          <input 
+            type="file" 
+            multiple 
+            accept=".pdf,.txt,.doc,.docx,.md" 
+            onChange={handleFileUpload} 
+            style={{ display: 'none' }} 
+            disabled={isUploading}
+          />
         </label>
-        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          {documents.length} documents • {selectedDocs.size} selected
-        </span>
-      </div>
 
-      <div className="module-content" style={{ display: 'flex', gap: '16px' }}>
-        <div style={{ flex: 1, maxWidth: '300px' }}>
-          <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>Documents</h3>
+        <nav className="writing-nav-items">
+          <div className="nav-item-v2">
+            <span>✍️</span> Writer
+          </div>
+          <div className="nav-item-v2">
+            <span>📒</span> Notes
+          </div>
+          <div className="nav-item-v2 active">
+            <span>📄</span> Research
+          </div>
+          <div className="nav-item-v2">
+            <span>📁</span> Archives
+          </div>
+          <div className="nav-item-v2">
+            <span>🗑️</span> Trash
+          </div>
+        </nav>
+
+        <div className="writing-nav-footer">
+          <a href="#" className="nav-footer-link" onClick={(e) => e.preventDefault()}>
+            <span className="nav-footer-icon">⏳</span> Sync Status
+          </a>
+          <a href="#" className="nav-footer-link" onClick={(e) => e.preventDefault()}>
+            <span className="nav-footer-icon">❓</span> Help Center
+          </a>
+        </div>
+      </aside>
+
+      {/* Pane 2: Middle Library Pane */}
+      <section className="notes-library-pane">
+        <div className="library-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2>Documents</h2>
+            <span className="node-count-badge">{documents.length} FILES</span>
+          </div>
+        </div>
+
+        <div className="library-search">
+          <span>🔍</span>
+          <input 
+            type="text" 
+            placeholder="Search documents..." 
+          />
+        </div>
+
+        <div className="note-list-v2">
           {documents.length === 0 ? (
-            <div className="module-empty"><p>No documents yet</p></div>
+            <div className="module-empty" style={{ opacity: 0.5 }}>No documents yet</div>
           ) : (
             documents.map((doc) => (
-              <div key={doc.id} className="module-card" style={{ marginBottom: '8px' }}>
-                <label style={{ display: 'flex', alignItems: 'start', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedDocs.has(doc.id)}
-                    onChange={(e) => {
-                      const newSet = new Set(selectedDocs);
-                      e.target.checked ? newSet.add(doc.id) : newSet.delete(doc.id);
-                      setSelectedDocs(newSet);
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{doc.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {formatFileSize(doc.size)} • {new Date(doc.uploadedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </label>
-                {doc.summary && (
-                  <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-muted)' }}>
-                    {doc.summary.slice(0, 100)}...
-                  </div>
-                )}
-                {!doc.summary && (
-                  <button className="btn btn-sm" style={{ marginTop: '4px' }} onClick={() => summarizeDocument(doc)}>
-                    📝 Summarize
-                  </button>
-                )}
+              <div key={doc.id} className={`note-card-v2 ${selectedDocs.has(doc.id) ? 'active' : ''}`} onClick={() => {
+                const newSet = new Set(selectedDocs);
+                selectedDocs.has(doc.id) ? newSet.delete(doc.id) : newSet.add(doc.id);
+                setSelectedDocs(newSet);
+              }}>
+                <div className="note-card-header">
+                  <h4 style={{ fontSize: '14px' }}>{doc.name}</h4>
+                  <input type="checkbox" checked={selectedDocs.has(doc.id)} readOnly />
+                </div>
+                <div className="note-card-snippet">
+                  {formatFileSize(doc.size)} • {new Date(doc.uploadedAt).toLocaleDateString()}
+                </div>
               </div>
             ))
           )}
         </div>
+      </section>
 
-        <div style={{ flex: 2 }}>
-          <div className="module-card">
-            <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Ask a Question</h3>
-            <input
-              className="input"
-              type="text"
-              placeholder="What would you like to know about these documents?"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && askQuestion()}
-              disabled={isProcessing}
+      {/* Pane 3: Right Content Pane */}
+      <main className="notes-editor-pane">
+        <header className="research-header-v2" style={{ padding: 0, border: 'none', background: 'none' }}>
+          <h2 style={{ fontSize: '32px' }}>Document Research</h2>
+          <p>Private document analysis with Q&A - files never leave your browser</p>
+        </header>
+
+        <div className="ask-question-card-v2" style={{ marginTop: '20px' }}>
+          <h3 style={{ textTransform: 'none', color: 'white', marginBottom: '20px', letterSpacing: 'normal' }}>Ask a Question</h3>
+          <div className="input-group-v2">
+            <input 
+                type="text" 
+                placeholder="What would you like to know about these documents?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && askQuestion()}
+                disabled={isProcessing}
             />
-            <button className="btn btn-primary" style={{ marginTop: '8px' }} onClick={askQuestion} disabled={isProcessing || selectedDocs.size === 0}>
-              {isProcessing ? '⏳ Processing...' : '🔍 Ask Question'}
-            </button>
           </div>
+          <button 
+            className="btn btn-primary" 
+            onClick={askQuestion} 
+            disabled={isProcessing || selectedDocs.size === 0}
+            style={{ padding: '12px 32px' }}
+          >
+            <span>🔍</span> {isProcessing ? 'Processing...' : 'Ask Question'}
+          </button>
+        </div>
 
-          <div style={{ marginTop: '16px' }}>
-            <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>Q&A History</h3>
-            {qaHistory.map((qa) => (
-              <div key={qa.id} className="module-card" style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Q: {qa.question}</div>
-                <div style={{ fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>A: {qa.answer}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                  {new Date(qa.timestamp).toLocaleString()}
+        <div className="qa-history-section-v2">
+          <h3 style={{ color: '#64748b' }}>Q&A History</h3>
+          <div className="qa-history-v2" style={{ marginTop: '20px' }}>
+            {qaHistory.length === 0 ? (
+              <div className="module-empty" style={{ opacity: 0.5 }}>No history yet</div>
+            ) : (
+              qaHistory.map((qa) => (
+                <div key={qa.id} className="qa-item-v2">
+                  <div className="qa-question-v2" style={{ fontSize: '15px' }}>
+                    <span style={{ color: '#ff5500' }}>Q:</span> {qa.question}
+                  </div>
+                  <div className="qa-answer-v2" style={{ fontSize: '15px' }}>
+                    {qa.answer}
+                  </div>
+                  <div className="qa-time-v2">
+                    {new Date(qa.timestamp).toLocaleString()}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
