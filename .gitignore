@@ -5,3 +5,7 @@ dist/
 *.tsbuildinfo
 .playwright-mcp/
 *.png
+.agent/
+.agents
+.claude/
+.qoder/

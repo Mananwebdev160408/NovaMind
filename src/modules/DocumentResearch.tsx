@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { generateText, ensureLLMLoaded, chunkText, generateId } from '../lib/ai-utils';
-import { create, getAll, deleteItem, STORES } from '../lib/storage';
+import { create, update, getAll, deleteItem, STORES } from '../lib/storage';
 import { extractTextFromDocument, isValidDocumentType, formatFileSize } from '../lib/document-utils';
 import type { ResearchDocument, DocumentQA } from '../types';
 

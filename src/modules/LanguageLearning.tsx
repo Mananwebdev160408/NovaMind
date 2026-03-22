@@ -21,32 +21,44 @@ export function LanguageLearning() {
 
   async function sendMessage() {
     if (!userInput.trim()) return;
-    setConversation([...conversation, { role: 'user', text: userInput }]);
+    const userMessage = userInput;
+    setConversation([...conversation, { role: 'user', text: userMessage }]);
+    setUserInput('');
     setIsProcessing(true);
 
     try {
       const systemPrompt = `You are a ${language} language teacher. User level: ${level}. Mode: ${mode}. Be encouraging and provide corrections when needed.`;
       let aiResponse = '';
+      
+      // Add empty AI message that will be updated as tokens arrive
+      setConversation((prev) => [...prev, { role: 'ai', text: '' }]);
+      
       await generateStreamingText(
-        userInput,
+        userMessage,
         { maxTokens: 300, temperature: 0.7, systemPrompt },
         (token) => {
           aiResponse += token;
+          // Update the last AI message in real-time
+          setConversation((prev) => {
+            const newConv = [...prev];
+            newConv[newConv.length - 1] = { role: 'ai', text: aiResponse };
+            return newConv;
+          });
         }
       );
-
-      setConversation((prev) => [...prev, { role: 'ai', text: aiResponse }]);
-      setUserInput('');
 
       const practice: LanguagePractice = {
         id: generateId(),
         language,
         type: mode,
-        content: userInput,
+        content: userMessage,
         aiResponse,
         timestamp: Date.now(),
       };
       await create(STORES.LANGUAGE, practice);
+    } catch (error) {
+      console.error('Language learning error:', error);
+      setConversation((prev) => [...prev, { role: 'ai', text: 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setIsProcessing(false);
     }

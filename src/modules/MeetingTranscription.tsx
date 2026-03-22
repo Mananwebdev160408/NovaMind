@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { generateText, ensureLLMLoaded, generateId } from '../lib/ai-utils';
-import { create, getAll, STORES } from '../lib/storage';
+import { create, update, getAll, STORES } from '../lib/storage';
 import { ModelManager, ModelCategory } from '../runanywhere';
 import type { Meeting, TranscriptSegment, ActionItem } from '../types';
 
@@ -65,7 +65,7 @@ export function MeetingTranscription() {
         actionItems,
         status: 'completed',
       };
-      await create(STORES.MEETINGS, updated);
+      await update(STORES.MEETINGS, updated);
       loadMeetings();
       setCurrentMeeting(null);
       setTranscript('');
