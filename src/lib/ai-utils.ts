@@ -100,6 +100,8 @@ export async function ensureLLMLoaded(): Promise<void> {
  * Calculate readability score (Flesch Reading Ease)
  */
 export function calculateReadabilityScore(text: string): number {
+  if (!text || text.length > 50000) return 0; // Guard against massive texts for real-time calculations
+  
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
   const words = text.split(/\s+/).filter((w) => w.length > 0);
   const syllables = words.reduce((count, word) => count + countSyllables(word), 0);
@@ -115,6 +117,7 @@ export function calculateReadabilityScore(text: string): number {
 }
 
 function countSyllables(word: string): number {
+  if (word.length > 50) word = word.slice(0, 50); // Truncate long "words" to prevent regex stack issue
   word = word.toLowerCase();
   if (word.length <= 3) return 1;
 
@@ -129,6 +132,7 @@ function countSyllables(word: string): number {
  * Count words in text
  */
 export function countWords(text: string): number {
+  if (!text) return 0;
   return text.split(/\s+/).filter((w) => w.length > 0).length;
 }
 
@@ -136,6 +140,8 @@ export function countWords(text: string): number {
  * Detect passive voice in text
  */
 export function detectPassiveVoice(text: string): string[] {
+  if (!text || text.length > 50000) return [];
+
   const passivePatterns = [
     /\b(am|is|are|was|were|be|been|being)\s+\w+ed\b/gi,
     /\b(am|is|are|was|were|be|been|being)\s+\w+en\b/gi,
@@ -144,7 +150,8 @@ export function detectPassiveVoice(text: string): string[] {
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
   const passiveSentences: string[] = [];
 
-  for (const sentence of sentences) {
+  for (let sentence of sentences) {
+    if (sentence.length > 1000) sentence = sentence.slice(0, 1000); // Safety limit on sentence length
     for (const pattern of passivePatterns) {
       if (pattern.test(sentence)) {
         passiveSentences.push(sentence.trim());
@@ -307,8 +314,17 @@ export function chunkText(text: string, chunkSize: number = 500, overlap: number
   while (start < words.length) {
     const end = Math.min(start + chunkSize, words.length);
     chunks.push(words.slice(start, end).join(' '));
-    start = end - overlap;
-    if (start >= words.length) break;
+    
+    // If we've reached the end, we're done
+    if (end >= words.length) break;
+    
+    // Move start forward, ensuring we make progress
+    const nextStart = end - overlap;
+    if (nextStart <= start) {
+      start = end; // Force progress if overlap is too large
+    } else {
+      start = nextStart;
+    }
   }
 
   return chunks;

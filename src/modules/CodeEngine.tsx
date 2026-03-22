@@ -65,53 +65,145 @@ export function CodeEngine() {
   }
 
   return (
-    <div className="module-container">
-      <div className="module-header">
-        <h2>💻 Code Documentation Engine</h2>
-        <p>Explain, document, and review code with AI</p>
-      </div>
+    <div className="code-v2-container">
+      {/* Pane 1: Global Nav Sidebar */}
+      <aside className="writing-nav-sidebar" style={{ width: '260px', minWidth: '260px' }}>
+        <div className="spectral-branding">
+          <div className="spectral-logo">🧠</div>
+          <div className="spectral-info">
+            <h3 style={{ fontSize: '13px', fontWeight: 800 }}>NovaMind</h3>
+            <span className="ai-status-badge">SPECTRAL ENGINE V2.4</span>
+          </div>
+        </div>
 
-      <div className="module-toolbar">
-        <select className="select" value={language} onChange={(e) => setLanguage(e.target.value)}>
-          <option value="javascript">JavaScript</option>
-          <option value="typescript">TypeScript</option>
-          <option value="python">Python</option>
-          <option value="java">Java</option>
-          <option value="cpp">C++</option>
-        </select>
-        <select className="select" value={analysisType} onChange={(e) => setAnalysisType(e.target.value as any)}>
-          <option value="explain">Explain</option>
-          <option value="document">Document</option>
-          <option value="review">Review</option>
-          <option value="test">Test Cases</option>
-        </select>
-        <button className="btn btn-primary" onClick={analyzeCode} disabled={isProcessing || !code}>
-          {isProcessing ? '⏳ Analyzing...' : '🔍 Analyze'}
-        </button>
-      </div>
+        <nav className="writing-nav-items" style={{ marginTop: '40px' }}>
+          <div className="nav-item-v2">
+            <span>🏠</span> Dashboard
+          </div>
+          <div className="nav-item-v2">
+            <span>📚</span> Learning
+          </div>
+          <div className="nav-item-v2">
+            <span>🛡️</span> Security
+          </div>
+          <div className="nav-item-v2">
+            <span>⚙️</span> Settings
+          </div>
+        </nav>
 
-      <div className="module-content" style={{ display: 'flex', gap: '16px' }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ marginTop: 'auto', padding: '20px' }}>
+             <button className="btn btn-primary" style={{ width: '100%', borderRadius: '12px', padding: '14px' }}>New Analysis</button>
+        </div>
+
+        <div className="writing-nav-footer">
+          <a href="#" className="nav-footer-link">
+            <span className="nav-footer-icon">?</span> Support
+          </a>
+          <a href="#" className="nav-footer-link">
+            <span className="nav-footer-icon">🚪</span> Logout
+          </a>
+        </div>
+      </aside>
+
+      {/* Pane 2: Primary Editor Pane */}
+      <main className="code-main-pane">
+        <div className="meetings-title" style={{ marginBottom: '40px' }}>
+          <h1>Code Documentation Engine</h1>
+          <p>Real-time neural analysis and documentation generation via local WebGPU clusters.</p>
+        </div>
+
+        <div className="lang-controls-row">
+           <div className="lang-control-card">
+              <div className="lang-control-label">💻 Language</div>
+              <select className="select-v2" value={language} onChange={(e) => setLanguage(e.target.value)}>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="python">Python</option>
+                <option value="java">Java</option>
+                <option value="cpp">C++</option>
+              </select>
+           </div>
+           <div className="lang-control-card">
+              <div className="lang-control-label">🔍 Analysis Mode</div>
+              <select className="select-v2" value={analysisType} onChange={(e) => setAnalysisType(e.target.value as any)}>
+                <option value="explain">Explain Logic</option>
+                <option value="document">Generate JSDoc</option>
+                <option value="review">Code Review</option>
+                <option value="test">Unit Test Cases</option>
+              </select>
+           </div>
+           <div className="lang-control-card" style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', borderRadius: '12px' }} 
+                onClick={analyzeCode} 
+                disabled={isProcessing || !code}
+              >
+                {isProcessing ? '⏳ Analyzing...' : '🔍 Neural Analysis'}
+              </button>
+           </div>
+        </div>
+
+        <div className="code-editor-v2">
           <textarea
-            className="editor"
-            style={{ minHeight: '400px', fontFamily: 'monospace' }}
-            placeholder="Paste your code here..."
+            className="notes-body-editor"
+            style={{ minHeight: '500px', fontFamily: '"JetBrains Mono", monospace', fontSize: '14px' }}
+            placeholder="// Paste or type your code here for spectral analysis..."
             value={code}
             onChange={(e) => setCode(e.target.value)}
             disabled={isProcessing}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          {result ? (
-            <div className="module-card" style={{ height: '400px', overflow: 'auto' }}>
-              <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>Result</h3>
-              <pre style={{ whiteSpace: 'pre-wrap', fontSize: '13px', lineHeight: '1.5' }}>{result}</pre>
-            </div>
-          ) : (
-            <div className="module-empty"><p>Analysis result will appear here</p></div>
-          )}
+      </main>
+
+      {/* Pane 3: Intelligence Sidebar */}
+      <aside className="code-intel-pane">
+        <div className="privacy-card-title">ANALYSIS RESULT</div>
+        
+        {result ? (
+           <div className="ai-summary-card-v2" style={{ border: '1px solid #ff550033' }}>
+              <div className="neural-header">
+                <div className="neural-icon">⚡</div>
+                <div>
+                   <h4>Neural Output</h4>
+                   <span>SPECTRAL CLUSTER 7B</span>
+                </div>
+              </div>
+              <pre style={{ 
+                whiteSpace: 'pre-wrap', 
+                fontSize: '13px', 
+                lineHeight: '1.6', 
+                color: '#e2e8f0',
+                fontFamily: '"Inter", sans-serif'
+              }}>
+                {result}
+              </pre>
+           </div>
+        ) : (
+           <div className="module-empty">
+              <p style={{ fontSize: '12px', opacity: 0.5 }}>Neural output will appear here after analysis.</p>
+           </div>
+        )}
+
+        <div className="privacy-card-title" style={{ marginTop: '40px' }}>ANALYSIS HISTORY</div>
+        <div className="pulse-metric-row">
+           {history.length === 0 && <p style={{ fontSize: '12px', opacity: 0.3, textAlign: 'center' }}>No recent history</p>}
+           {history.map((h) => (
+              <div key={h.id} className="pulse-metric-item" style={{ cursor: 'pointer' }} onClick={() => { setCode(h.code); setResult(h.result); }}>
+                 <div className="pulse-metric-info">
+                    <span className="pulse-metric-icon">📑</span>
+                    <div className="pulse-metric-label">
+                       <h4 style={{ fontSize: '12px' }}>{h.type.toUpperCase()}</h4>
+                       <p>{h.language}</p>
+                    </div>
+                 </div>
+                 <div className="pulse-metric-value" style={{ fontSize: '10px', opacity: 0.5 }}>
+                   {new Date(h.timestamp).toLocaleDateString()}
+                 </div>
+              </div>
+           ))}
         </div>
-      </div>
+      </aside>
     </div>
   );
 }

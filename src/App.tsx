@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { initSDK, getAccelerationMode } from './runanywhere';
 import { initDB } from './lib/storage';
 
+// Components
+import { Navbar } from './components/Navbar';
+import { LandingPage } from './components/LandingPage';
+
 // Module components
 import { WritingAssistant } from './modules/WritingAssistant';
 import { NotesModule } from './modules/NotesModule';
@@ -12,7 +16,8 @@ import { MeetingTranscription } from './modules/MeetingTranscription';
 import { KnowledgeGraph } from './modules/KnowledgeGraph';
 import { PrivacyDashboard } from './modules/PrivacyDashboard';
 
-type Module =
+export type Module =
+  | 'home'
   | 'writing'
   | 'notes'
   | 'language'
@@ -26,7 +31,7 @@ export function App() {
   const [sdkReady, setSdkReady] = useState(false);
   const [dbReady, setDbReady] = useState(false);
   const [sdkError, setSdkError] = useState<string | null>(null);
-  const [activeModule, setActiveModule] = useState<Module>('writing');
+  const [activeModule, setActiveModule] = useState<Module>('home');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -72,7 +77,7 @@ export function App() {
     return (
       <div className="app-loading">
         <div className="spinner" />
-        <h2>🧠 Initializing NovaMind</h2>
+        <h2 style={{ fontFamily: 'var(--font-display)' }}>🧠 Initializing NovaMind</h2>
         <p>Loading on-device AI engine & local storage...</p>
         <p className="text-muted" style={{ fontSize: '12px', marginTop: '8px' }}>
           100% Private • Zero Cloud • Full Intelligence
@@ -81,87 +86,14 @@ export function App() {
     );
   }
 
-  const accel = getAccelerationMode();
-
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>🧠 NovaMind</h1>
-        {accel && (
-          <span className="badge" title={accel === 'webgpu' ? 'GPU Accelerated' : 'CPU Mode'}>
-            {accel === 'webgpu' ? 'WebGPU' : 'CPU'}
-          </span>
+      <Navbar activeModule={activeModule} setActiveModule={setActiveModule} />
+
+      <main className={activeModule === 'home' ? '' : 'tab-content'}>
+        {activeModule === 'home' && (
+          <LandingPage onGetStarted={() => setActiveModule('writing')} />
         )}
-        <button
-          className="btn btn-sm"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setCommandPaletteOpen(true)}
-          title="Command Palette (⌘K / Ctrl+K)"
-        >
-          ⌘K
-        </button>
-      </header>
-
-      <nav className="tab-bar">
-        <button
-          className={activeModule === 'writing' ? 'active' : ''}
-          onClick={() => setActiveModule('writing')}
-          title="Smart Writing Assistant"
-        >
-          ✍️ Write
-        </button>
-        <button
-          className={activeModule === 'notes' ? 'active' : ''}
-          onClick={() => setActiveModule('notes')}
-          title="Intelligent Notes"
-        >
-          📓 Notes
-        </button>
-        <button
-          className={activeModule === 'research' ? 'active' : ''}
-          onClick={() => setActiveModule('research')}
-          title="Document Research"
-        >
-          📄 Research
-        </button>
-        <button
-          className={activeModule === 'meeting' ? 'active' : ''}
-          onClick={() => setActiveModule('meeting')}
-          title="Meeting Transcription"
-        >
-          🎙️ Meeting
-        </button>
-        <button
-          className={activeModule === 'code' ? 'active' : ''}
-          onClick={() => setActiveModule('code')}
-          title="Code Documentation"
-        >
-          💻 Code
-        </button>
-        <button
-          className={activeModule === 'language' ? 'active' : ''}
-          onClick={() => setActiveModule('language')}
-          title="Language Learning"
-        >
-          🌍 Language
-        </button>
-        <button
-          className={activeModule === 'knowledge' ? 'active' : ''}
-          onClick={() => setActiveModule('knowledge')}
-          title="Knowledge Graph"
-        >
-          🧩 Graph
-        </button>
-        <button
-          className={activeModule === 'privacy' ? 'active' : ''}
-          onClick={() => setActiveModule('privacy')}
-          title="Privacy Dashboard"
-        >
-          🔒 Privacy
-        </button>
-      </nav>
-
-      <main className="tab-content">
         {activeModule === 'writing' && <WritingAssistant />}
         {activeModule === 'notes' && <NotesModule />}
         {activeModule === 'language' && <LanguageLearning />}
@@ -196,6 +128,7 @@ function CommandPalette({ onClose, onSelectModule }: CommandPaletteProps) {
   const [search, setSearch] = useState('');
 
   const commands = [
+    { id: 'home', icon: '🏠', label: 'Home', keywords: 'landing page start' },
     { id: 'writing', icon: '✍️', label: 'Writing Assistant', keywords: 'write text document email' },
     { id: 'notes', icon: '📓', label: 'Notes', keywords: 'note idea task meeting' },
     { id: 'research', icon: '📄', label: 'Document Research', keywords: 'pdf document research analyze' },

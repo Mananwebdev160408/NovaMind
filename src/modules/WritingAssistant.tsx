@@ -213,149 +213,202 @@ export function WritingAssistant() {
   }
 
   return (
-    <div className="module-container">
-      <div className="module-header">
-        <h2>✍️ Writing Assistant</h2>
-        <p>AI-powered writing with tone transformation, expansion, and readability analysis</p>
-      </div>
-
-      <div className="module-toolbar">
-        <select
-          className="select"
-          value={mode}
-          onChange={(e) => setMode(e.target.value as WritingMode)}
-          disabled={isGenerating}
-        >
-          <option value="document">Document</option>
-          <option value="email">Email</option>
-          <option value="blog">Blog Post</option>
-          <option value="creative">Creative Writing</option>
-        </select>
-
-        <button className="btn btn-sm" onClick={() => setShowToneMenu(!showToneMenu)} disabled={isGenerating || !content || !isModelReady}>
-          🎭 Transform Tone
-        </button>
-
-        <button className="btn btn-sm" onClick={expandText} disabled={isGenerating || !isModelReady}>
-          ➕ Expand
-        </button>
-
-        <button className="btn btn-sm" onClick={compressText} disabled={isGenerating || !isModelReady}>
-          ➖ Compress
-        </button>
-
-        <button className="btn btn-sm" onClick={() => setShowInsights(!showInsights)}>
-          📊 {showInsights ? 'Hide' : 'Show'} Insights
-        </button>
-
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-          <button className="btn btn-sm" onClick={newDocument} disabled={isGenerating}>
-            📄 New
-          </button>
-          <button className="btn btn-sm btn-primary" onClick={saveDocument} disabled={isGenerating || !content}>
-            💾 Save
-          </button>
+    <div className="writing-v2-container">
+      {/* Left Navigation Sidebar */}
+      <aside className="writing-nav-sidebar">
+        <div className="spectral-brand">
+          <div className="spectral-logo">🧠</div>
+          <div className="spectral-info">
+            <h3>Spectral Engine</h3>
+            <span>V4.2 ACTIVE</span>
+          </div>
         </div>
-      </div>
 
-      {showToneMenu && (
-        <div className="module-toolbar" style={{ background: 'var(--bg-card)' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Select tone:</span>
-          {(['formal', 'casual', 'persuasive', 'empathetic', 'concise', 'executive'] as ToneType[]).map((tone) => (
-            <button key={tone} className="btn btn-sm" onClick={() => transformTone(tone)} disabled={isGenerating}>
-              {tone.charAt(0).toUpperCase() + tone.slice(1)}
+        <button className="btn-new-draft" onClick={newDocument}>
+          + New Draft
+        </button>
+
+        <nav className="writing-nav-items">
+          <div className="nav-item-v2 active">
+            <span>✍️</span> Writer
+          </div>
+          <div className="nav-item-v2" onClick={() => setShowInsights(!showInsights)}>
+            <span>📊</span> Neural Insights
+          </div>
+        </nav>
+
+        <div className="writing-nav-footer">
+          <a href="#" className="nav-footer-link">
+            <span className="nav-footer-icon">?</span> Support
+          </a>
+          <a href="#" className="nav-footer-link">
+            <span className="nav-footer-icon code">{'<>'}</span> API
+          </a>
+        </div>
+      </aside>
+
+      {/* Main Editor Section */}
+      <main className="writing-editor-main">
+        <div className="writing-top-bar">
+          <div className="writing-title-area">
+            <h2>Writing Assistant</h2>
+            <span className="gpu-badge">WEBGPU ENABLED</span>
+          </div>
+          <div className="writing-top-actions">
+            <button className="btn btn-sm btn-primary" onClick={saveDocument} disabled={isGenerating || !content}>
+              💾 Save
             </button>
-          ))}
-        </div>
-      )}
-
-      {showInsights && content && (
-        <div className="module-toolbar" style={{ background: 'var(--bg-card)', flexWrap: 'wrap' }}>
-          <div className="metric-inline">
-            <strong>{wordCount}</strong> words
-          </div>
-          <div className="metric-inline">
-            <strong>{readabilityScore.toFixed(0)}</strong> readability
-          </div>
-          {passiveVoice.length > 0 && (
-            <div className="metric-inline" style={{ color: 'var(--primary)' }}>
-              {passiveVoice.length} passive voice
+            <button className="btn btn-sm btn-outline" onClick={expandText} disabled={isGenerating || !isModelReady}>
+              ➕ Expand
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={compressText} disabled={isGenerating || !isModelReady}>
+              ➖ Compress
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={() => setShowToneMenu(!showToneMenu)}>
+              🎭 Transform Tone ▾
+            </button>
+            <div className="toggle-group">
+              <span>Show Insights</span>
+              <input 
+                type="checkbox" 
+                checked={showInsights} 
+                onChange={() => setShowInsights(!showInsights)}
+                style={{ cursor: 'pointer' }}
+              />
             </div>
-          )}
-          {fillerWords.length > 0 && (
-            <div className="metric-inline" style={{ color: 'var(--primary)' }}>
-              {fillerWords.reduce((sum, f) => sum + f.count, 0)} filler words
-            </div>
-          )}
+          </div>
         </div>
-      )}
 
-      <div className="module-content" style={{ display: 'flex', gap: '16px' }}>
-        <div style={{ flex: 2 }}>
-          <textarea
-            ref={textareaRef}
-            className="editor"
-            style={{ width: '100%', minHeight: '400px', flex: 1 }}
-            placeholder={`Start writing your ${mode}... or use the AI to generate content.`}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            disabled={isGenerating}
-          />
-
-          <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="editor-surface">
+          <div className="editor-container-v2">
+            <div className="editor-breadcrumb">
+              DRAFTING • {currentDoc?.title || 'MY NEW PROJECT'}
+            </div>
             <input
-              className="input"
-              type="text"
-              placeholder="Describe what you want to write..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                  generateText(e.currentTarget.value);
-                  e.currentTarget.value = '';
+              className="editor-heading-v2"
+              placeholder="The Neural Interface Revolution"
+              value={currentDoc?.title || ''}
+              onChange={(e) => {
+                if (currentDoc) {
+                  setCurrentDoc({ ...currentDoc, title: e.target.value });
                 }
               }}
-              disabled={isGenerating || !isModelReady}
             />
-            <button
-              className="btn btn-primary"
-              onClick={(e) => {
-                const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                if (input.value.trim()) {
-                  generateText(input.value);
-                  input.value = '';
-                }
-              }}
-              disabled={isGenerating || !isModelReady}
-            >
-              {!isModelReady ? '⏳ Loading Model...' : isGenerating ? '⏳ Generating...' : '✨ Generate'}
-            </button>
+            <textarea
+              ref={textareaRef}
+              className="editor-body-v2"
+              placeholder="Start writing your thoughts here..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              disabled={isGenerating}
+            />
           </div>
-        </div>
 
-        {documents.length > 0 && (
-          <div style={{ flex: 1, maxWidth: '250px' }}>
-            <h3 style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-muted)' }}>Recent Documents</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {documents.slice(0, 10).map((doc) => (
-                <button
-                  key={doc.id}
-                  className="module-card"
-                  style={{ cursor: 'pointer', padding: '10px', textAlign: 'left' }}
-                  onClick={() => {
-                    setCurrentDoc(doc);
-                    setContent(doc.content);
-                    setMode(doc.mode);
-                  }}
-                >
-                  <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>{doc.title}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {doc.wordCount} words • {new Date(doc.updatedAt).toLocaleDateString()}
-                  </div>
-                </button>
-              ))}
+          {/* Floating Prompt Bar */}
+          <div className="writing-v2-prompt-bar">
+            <div className="prompt-input-row">
+              <span className="prompt-icon">✨</span>
+              <input
+                className="prompt-input-v2"
+                placeholder="Describe what you want to write..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                    generateText(e.currentTarget.value);
+                    e.currentTarget.value = '';
+                  }
+                }}
+                disabled={isGenerating || !isModelReady}
+              />
+              <button
+                className="btn-generate-v2"
+                onClick={(e) => {
+                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                  if (input.value.trim()) {
+                    generateText(input.value);
+                    input.value = '';
+                  }
+                }}
+                disabled={isGenerating || !isModelReady}
+              >
+                {isGenerating ? '⏳' : 'Generate >'}
+              </button>
+            </div>
+            <div className="prompt-footer-v2">
+              <div className="prompt-info-tag">⚡ Ultra Low Latency</div>
+              <div className="prompt-info-tag">🔒 Privacy Focused</div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      </main>
+
+      {/* Right Insights Sidebar */}
+      {showInsights && (
+        <aside className="writing-insights-sidebar">
+          <div className="insights-section">
+            <span className="insights-label">INTELLIGENCE METRICS</span>
+            <div className="metric-v2">
+              <div className="metric-v2-header">
+                <span>Clarity</span>
+                <span>{readabilityScore.toFixed(0)}%</span>
+              </div>
+              <div className="metric-v2-bar">
+                <div 
+                  className="metric-v2-fill" 
+                  style={{ width: `${Math.min(readabilityScore, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="metric-v2">
+              <div className="metric-v2-header">
+                <span>Sentiment</span>
+                <span style={{ color: 'var(--primary)' }}>Analytic</span>
+              </div>
+              <div className="metric-v2-bar">
+                <div className="metric-v2-fill" style={{ width: '70%', background: 'var(--primary)' }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="insights-section">
+            <div className="metric-cards-row">
+              <div className="metric-card-v2">
+                <div className="metric-card-label">Words</div>
+                <div className="metric-card-value">{wordCount.toLocaleString()}</div>
+              </div>
+              <div className="metric-card-v2">
+                <div className="metric-card-label">Read Time</div>
+                <div className="metric-card-value">{Math.ceil(wordCount / 200)}m</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="insights-section">
+            <span className="insights-label">AI SUGGESTIONS</span>
+            <div className="ai-suggestion-card">
+              <div className="suggestion-type">✨ Better Flow</div>
+              <div className="suggestion-text-v2">
+                Consider merging the first two paragraphs to maintain a stronger narrative momentum.
+              </div>
+            </div>
+            <div className="vocab-card">
+              <div className="suggestion-type">📖 Vocabulary</div>
+              <div className="suggestion-text-v2">
+                "Paradigm shift" is used frequently. Try "Fundamental reconfiguration".
+              </div>
+            </div>
+          </div>
+
+          <div className="engine-load-visual">
+            <div className="engine-load-label">
+              <span>Engine Load</span>
+              <span style={{ color: 'var(--green)' }}>Minimal</span>
+            </div>
+            <div className="metric-v2-bar">
+              <div className="metric-v2-fill" style={{ width: '15%', background: 'var(--green)' }}></div>
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
