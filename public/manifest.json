@@ -1,0 +1,43 @@
+{
+  "name": "NovaMind - AI-Powered Productivity Suite",
+  "short_name": "NovaMind",
+  "description": "100% on-device AI productivity tools. Zero cloud. Zero data leakage. Full intelligence in your browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#FF5500",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities", "education"],
+  "shortcuts": [
+    {
+      "name": "Writing Assistant",
+      "short_name": "Write",
+      "description": "Create and edit documents",
+      "url": "/?module=writing",
+      "icons": []
+    },
+    {
+      "name": "Notes",
+      "short_name": "Notes",
+      "description": "Take intelligent notes",
+      "url": "/?module=notes",
+      "icons": []
+    },
+    {
+      "name": "Privacy Dashboard",
+      "short_name": "Privacy",
+      "description": "View privacy & storage stats",
+      "url": "/?module=privacy",
+      "icons": []
+    }
+  ],
+  "prefer_related_applications": false
+}
