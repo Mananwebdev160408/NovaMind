@@ -1,121 +1,121 @@
-import React from 'react';
-
-type Module =
-  | 'home'
-  | 'writing'
-  | 'notes'
-  | 'research'
-  | 'meeting'
-  | 'code'
-  | 'language'
-  | 'knowledge'
-  | 'privacy';
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 interface NavbarProps {
-  activeModule: Module;
-  setActiveModule: (module: Module) => void;
+  isLoggedIn: boolean;
+  onAuth: () => void;
+  onLogout: () => void;
+  theme: 'dark' | 'light';
+  toggleTheme: () => void;
+  isSidebarExpanded?: boolean;
+  onToggleSidebar?: () => void;
+  activeModule?: string | null;
+  onNavigate?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeModule, setActiveModule }) => {
-  const navItems: { id: Module; label: string }[] = [
-    { id: 'home', label: 'Home' },
-    { id: 'writing', label: 'Write' },
-    { id: 'notes', label: 'Notes' },
-    { id: 'research', label: 'Research' },
-    { id: 'meeting', label: 'Meeting' },
-    { id: 'code', label: 'Code' },
-    { id: 'language', label: 'Language' },
-    { id: 'knowledge', label: 'Graph' },
-    { id: 'privacy', label: 'Privacy' },
+export function Navbar({ 
+  isLoggedIn, onAuth, onLogout, 
+  theme, toggleTheme, isSidebarExpanded, onToggleSidebar,
+  activeModule, onNavigate
+}: NavbarProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+  
+  const handleAuthRedirect = () => {
+    onAuth();
+    setIsMobileMenuOpen(false);
+  };
+
+  const navLinks = [
+    { label: 'Capabilities', to: '/#features' },
+    { label: 'Privacy', to: '/#privacy' },
+    { label: 'About', to: '/#about' }
   ];
 
   return (
-    <nav className="navbar">
-      <div className="navbar-content">
-        <div className="navbar-logo" onClick={() => setActiveModule('home')}>
-          <img src="/favicon.png" alt="Logo" className="navbar-icon" />
-          NovaMind
-        </div>
-        <div className="navbar-links">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              className={`nav-link ${activeModule === item.id ? 'active' : ''}`}
-              onClick={() => setActiveModule(item.id)}
+    <header className="shell-header">
+      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0' }}>
+        {/* Left: Branding */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          {isLoggedIn && (
+            <button 
+              onClick={onToggleSidebar} 
+              className="btn btn-ghost"
+              style={{ width: '40px', height: '40px', padding: '0' }}
             >
-              {item.label}
+              <span style={{ transform: isSidebarExpanded ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.4s', fontSize: '18px' }}>←</span>
             </button>
-          ))}
+          )}
+          
+          <Link to={isLoggedIn ? "/dashboard" : "/"} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+            <div style={{ width: '24px', height: '24px', background: 'var(--accent)', borderRadius: '4px' }} />
+            <span style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>NovaMind</span>
+          </Link>
+        </div>
+
+        {/* Middle: Desktop Nav */}
+        {!isLoggedIn && (
+          <nav className="desktop-only" style={{ display: 'flex', gap: '32px' }}>
+            {navLinks.map(item => (
+              <Link key={item.to} to={item.to} style={{ textDecoration: 'none', color: 'var(--text-dim)', fontSize: '14px', fontWeight: 500 }}>{item.label}</Link>
+            ))}
+          </nav>
+        )}
+
+        {/* Right: Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button onClick={toggleTheme} className="btn btn-ghost" style={{ fontSize: '18px', padding: '8px' }}>
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
+          {!isLoggedIn ? (
+            <button className="btn btn-primary" onClick={handleAuthRedirect}>Sign In</button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div 
+                onClick={() => navigate('/dashboard/profile')} 
+                style={{ 
+                  width: '32px', height: '32px', borderRadius: '50%', 
+                  background: 'var(--accent-soft)', border: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' 
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>👤</span>
+              </div>
+              <button className="btn btn-ghost" onClick={() => { onLogout(); navigate('/'); }} style={{ color: 'var(--danger)', fontSize: '13px' }}>Sign Out</button>
+            </div>
+          )}
+          
+          {!isLoggedIn && (
+            <button 
+              className="mobile-only btn btn-ghost" 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              style={{ fontSize: '20px' }}
+            >
+              {isMobileMenuOpen ? '✕' : '☰'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {!isLoggedIn && isMobileMenuOpen && (
+        <div style={{ position: 'fixed', top: '64px', left: 0, width: '100%', height: 'calc(100vh - 64px)', background: 'var(--bg-app)', padding: '32px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {navLinks.map(item => (
+            <Link key={item.to} to={item.to} onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none', color: 'var(--text-main)', fontSize: '24px', fontWeight: 600 }}>{item.label}</Link>
+          ))}
+          <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
+             <button className="btn btn-primary" style={{ width: '100%', padding: '16px' }} onClick={handleAuthRedirect}>Sign In</button>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        .navbar {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          background: rgba(3, 7, 18, 0.8);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid var(--border);
-          padding: 16px 0;
-        }
-        .navbar-content {
-          display: flex;
-          align-items: center;
-          position: relative;
-          padding: 0 40px;
-          width: 100%;
-        }
-        .navbar-logo {
-          font-family: var(--font-display);
-          font-size: 24px;
-          font-weight: 800;
-          color: var(--primary);
-          cursor: pointer;
-          transition: opacity 0.2s;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .navbar-icon {
-          width: 32px;
-          height: 32px;
-          object-fit: contain;
-        }
-        .navbar-logo:hover {
-          opacity: 0.8;
-        }
-        .navbar-links {
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          display: flex;
-          gap: 8px;
-        }
-        .nav-link {
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          font-size: 14px;
-          font-weight: 500;
-          padding: 8px 12px;
-          cursor: pointer;
-          border-radius: 8px;
-          transition: all 0.2s;
-        }
-        .nav-link:hover {
-          color: var(--text);
-          background: rgba(255, 255, 255, 0.05);
-        }
-        .nav-link.active {
-          color: var(--primary);
-          background: rgba(255, 85, 0, 0.1);
-        }
-        @media (max-width: 900px) {
-          .navbar-links {
-            display: none; /* In a real app we'd add a mobile menu */
-          }
-        }
+        @media (min-width: 769px) { .mobile-only { display: none !important; } }
+        @media (max-width: 768px) { .desktop-only { display: none !important; } }
       `}</style>
-    </nav>
+    </header>
   );
-};
+}

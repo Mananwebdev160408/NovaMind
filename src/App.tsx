@@ -1,180 +1,153 @@
-import { useState, useEffect } from 'react';
-import { initSDK, getAccelerationMode } from './runanywhere';
-import { initDB } from './lib/storage';
-
-// Components
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
-
-// Module components
+import { Auth } from './components/Auth';
+import { Dashboard } from './components/Dashboard';
+import { CommandPalette } from './components/CommandPalette';
 import { WritingAssistant } from './modules/WritingAssistant';
-import { NotesModule } from './modules/NotesModule';
-import { LanguageLearning } from './modules/LanguageLearning';
-import { DocumentResearch } from './modules/DocumentResearch';
 import { CodeEngine } from './modules/CodeEngine';
+import { DocumentResearch } from './modules/DocumentResearch';
+import { LanguageLearning } from './modules/LanguageLearning';
 import { MeetingTranscription } from './modules/MeetingTranscription';
-import { KnowledgeGraph } from './modules/KnowledgeGraph';
 import { PrivacyDashboard } from './modules/PrivacyDashboard';
+import { KnowledgeGraph } from './modules/KnowledgeGraph';
+import { NotesModule } from './modules/NotesModule';
+import './styles/index.css';
 
-export type Module =
-  | 'home'
-  | 'writing'
-  | 'notes'
-  | 'language'
-  | 'research'
-  | 'code'
-  | 'meeting'
-  | 'knowledge'
-  | 'privacy';
+// Protected Route Component
+const ProtectedRoute = ({ user, children }: { user: any; children: React.ReactNode }) => {
+  if (!user) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
 
-export function App() {
-  const [sdkReady, setSdkReady] = useState(false);
-  const [dbReady, setDbReady] = useState(false);
-  const [sdkError, setSdkError] = useState<string | null>(null);
-  const [activeModule, setActiveModule] = useState<Module>('home');
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+function AppContent() {
+  const [user, setUser] = useState<any>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [loading, setLoading] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
-    // Initialize SDK and Database
-    Promise.all([initSDK(), initDB()])
-      .then(() => {
-        setSdkReady(true);
-        setDbReady(true);
-      })
-      .catch((err) => setSdkError(err instanceof Error ? err.message : String(err)));
+    // Check for existing session
+    const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    
+    if (savedUser && token) {
+      setUser(JSON.parse(savedUser));
+    }
+
+    const load = async () => {
+      await new Promise(r => setTimeout(r, 1000));
+      setLoading(false);
+    };
+    load();
   }, []);
 
   useEffect(() => {
-    // Command Palette keyboard shortcut (Cmd+K / Ctrl+K)
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  // Command Palette keyboard shortcut
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setCommandPaletteOpen((prev) => !prev);
-      }
-      // Escape to close
-      if (e.key === 'Escape' && commandPaletteOpen) {
-        setCommandPaletteOpen(false);
+        setIsCommandPaletteOpen(true);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [commandPaletteOpen]);
+  }, []);
 
-  if (sdkError) {
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  const toggleSidebar = () => setIsSidebarExpanded(prev => !prev);
+
+  const handleAuthSuccess = (userData: any) => {
+    setUser(userData);
+    setIsAuthOpen(false);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+  };
+
+  if (loading) {
     return (
-      <div className="app-loading">
-        <h2>Initialization Error</h2>
-        <p className="error-text">{sdkError}</p>
-        <button className="btn btn-primary" onClick={() => window.location.reload()}>
-          Reload App
-        </button>
+      <div style={{ height: '100vh', background: 'var(--bg-midnight)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '40px', height: '40px', background: 'var(--accent-indigo)', borderRadius: '8px', animation: 'loadRotate 2s infinite cubic-bezier(0.16, 1, 0.3, 1)', boxShadow: '0 0 30px var(--accent-glow)' }} />
+        <h2 style={{ marginTop: '48px', letterSpacing: '0.4em', fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>NOVAMIND</h2>
+        <div className="mono" style={{ marginTop: '16px', opacity: 0.3, fontSize: '9px' }}>PROTOCOL_INITIALIZING...</div>
+        <style>{` 
+          @keyframes loadRotate { 
+            0% { transform: scale(0.8) rotate(0deg); opacity: 0.5; } 
+            50% { transform: scale(1.1) rotate(180deg); opacity: 1; } 
+            100% { transform: scale(0.8) rotate(360deg); opacity: 0.5; } 
+          } 
+        `}</style>
       </div>
     );
   }
 
-  if (!sdkReady || !dbReady) {
-    return (
-      <div className="app-loading">
-        <div className="spinner" />
-        <h2 style={{ fontFamily: 'var(--font-display)' }}>🧠 Initializing NovaMind</h2>
-        <p>Loading on-device AI engine & local storage...</p>
-        <p className="text-muted" style={{ fontSize: '12px', marginTop: '8px' }}>
-          100% Private • Zero Cloud • Full Intelligence
-        </p>
-      </div>
-    );
-  }
+  const modules = {
+    'writing': { name: 'Cognitive Drafting', component: <WritingAssistant />, desc: 'Neural assisted writing environment' },
+    'code': { name: 'Architecture Scan', component: <CodeEngine />, desc: 'Structural AST analysis' },
+    'research': { name: 'Research Core', component: <DocumentResearch />, desc: 'Semantic knowledge extraction' },
+    'language': { name: 'Language Arena', component: <LanguageLearning />, desc: 'Vocal sync practice' },
+    'meetings': { name: 'Neural Audio', component: <MeetingTranscription />, desc: 'Isolated hardware transcription' },
+    'privacy': { name: 'Privacy Core', component: <PrivacyDashboard />, desc: 'Hardware isolation control' },
+    'graph': { name: 'Knowledge Graph', component: <KnowledgeGraph />, desc: 'Relational logic mapping' },
+    'notes': { name: 'Atomic Vault', component: <NotesModule />, desc: 'Decentralized thought archive' }
+  };
 
   return (
-    <div className="app">
-      <Navbar activeModule={activeModule} setActiveModule={setActiveModule} />
+    <div className="App">
+      <Navbar 
+        activeModule={location.pathname.split('/').pop() || null} 
+        onNavigate={() => {}} // No longer used directly for module switching
+        isLoggedIn={!!user}
+        onAuth={() => setIsAuthOpen(true)}
+        onLogout={handleLogout}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        isSidebarExpanded={isSidebarExpanded}
+        onToggleSidebar={toggleSidebar}
+      />
+      
+      {isAuthOpen && <Auth onSuccess={handleAuthSuccess} onClose={() => setIsAuthOpen(false)} />}
+      
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen} 
+        onClose={() => setIsCommandPaletteOpen(false)}
+        modules={modules}
+      />
 
-      <main className={activeModule === 'home' ? '' : 'tab-content'}>
-        {activeModule === 'home' && (
-          <LandingPage onGetStarted={() => setActiveModule('writing')} />
-        )}
-        {activeModule === 'writing' && <WritingAssistant />}
-        {activeModule === 'notes' && <NotesModule />}
-        {activeModule === 'language' && <LanguageLearning />}
-        {activeModule === 'research' && <DocumentResearch />}
-        {activeModule === 'code' && <CodeEngine />}
-        {activeModule === 'meeting' && <MeetingTranscription />}
-        {activeModule === 'knowledge' && <KnowledgeGraph />}
-        {activeModule === 'privacy' && <PrivacyDashboard />}
-      </main>
-
-      {/* Command Palette */}
-      {commandPaletteOpen && (
-        <CommandPalette
-          onClose={() => setCommandPaletteOpen(false)}
-          onSelectModule={(module) => {
-            setActiveModule(module);
-            setCommandPaletteOpen(false);
-          }}
-        />
-      )}
+      <Routes>
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage onAuth={() => setIsAuthOpen(true)} />} />
+        <Route path="/dashboard/*" element={
+          <ProtectedRoute user={user}>
+            <Dashboard 
+              user={user} 
+              isSidebarExpanded={isSidebarExpanded}
+              modules={modules}
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }
 
-// Command Palette Component
-interface CommandPaletteProps {
-  onClose: () => void;
-  onSelectModule: (module: Module) => void;
-}
-
-function CommandPalette({ onClose, onSelectModule }: CommandPaletteProps) {
-  const [search, setSearch] = useState('');
-
-  const commands = [
-    { id: 'home', icon: '🏠', label: 'Home', keywords: 'landing page start' },
-    { id: 'writing', icon: '✍️', label: 'Writing Assistant', keywords: 'write text document email' },
-    { id: 'notes', icon: '📓', label: 'Notes', keywords: 'note idea task meeting' },
-    { id: 'research', icon: '📄', label: 'Document Research', keywords: 'pdf document research analyze' },
-    { id: 'meeting', icon: '🎙️', label: 'Meeting Transcription', keywords: 'meeting record transcript' },
-    { id: 'code', icon: '💻', label: 'Code Documentation', keywords: 'code programming develop' },
-    { id: 'language', icon: '🌍', label: 'Language Learning', keywords: 'language learn speak practice' },
-    { id: 'knowledge', icon: '🧩', label: 'Knowledge Graph', keywords: 'graph knowledge connect visual' },
-    { id: 'privacy', icon: '🔒', label: 'Privacy Dashboard', keywords: 'privacy security storage data' },
-  ];
-
-  const filtered = commands.filter(
-    (cmd) =>
-      cmd.label.toLowerCase().includes(search.toLowerCase()) ||
-      cmd.keywords.toLowerCase().includes(search.toLowerCase())
-  );
-
+export function App() {
   return (
-    <div className="command-palette-overlay" onClick={onClose}>
-      <div className="command-palette" onClick={(e) => e.stopPropagation()}>
-        <input
-          type="text"
-          className="command-palette-search"
-          placeholder="Search modules..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          autoFocus
-        />
-        <div className="command-palette-results">
-          {filtered.map((cmd) => (
-            <button
-              key={cmd.id}
-              className="command-palette-item"
-              onClick={() => onSelectModule(cmd.id as Module)}
-            >
-              <span className="command-palette-icon">{cmd.icon}</span>
-              <span className="command-palette-label">{cmd.label}</span>
-            </button>
-          ))}
-          {filtered.length === 0 && (
-            <div className="command-palette-empty">No modules found</div>
-          )}
-        </div>
-        <div className="command-palette-footer">
-          <kbd>↑↓</kbd> Navigate <kbd>Enter</kbd> Select <kbd>Esc</kbd> Close
-        </div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }

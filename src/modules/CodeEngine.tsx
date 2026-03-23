@@ -1,208 +1,130 @@
-/**
- * Module 5: Code Documentation & Explanation Engine
- */
-
-import { useState, useEffect } from 'react';
-import { generateText, ensureLLMLoaded, generateId } from '../lib/ai-utils';
-import { create, getAll, STORES } from '../lib/storage';
-import type { CodeAnalysis } from '../types';
+import React, { useState } from 'react';
+import { useModelLoader } from '../hooks/useModelLoader';
+import { ModelCategory } from '@runanywhere/web';
+import { generateStreamingText } from '../lib/ai-utils';
 
 export function CodeEngine() {
-  const [code, setCode] = useState('');
-  const [language, setLanguage] = useState('javascript');
-  const [analysisType, setAnalysisType] = useState<'explain' | 'document' | 'review' | 'test'>('explain');
-  const [result, setResult] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [history, setHistory] = useState<CodeAnalysis[]>([]);
+  const [code, setCode] = useState(`// Paste code here for analysis\nfunction example() {\n  console.log("Hello NovaMind");\n}`);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [insight, setInsight] = useState('Initiate diagnostic to receive architectural insight.');
+  const { state: modelState, ensure: ensureModel } = useModelLoader(ModelCategory.Language);
 
-  useEffect(() => {
-    loadHistory();
-    ensureLLMLoaded().catch(console.error);
-  }, []);
+  const runDiagnostic = async () => {
+    if (isAnalyzing) return;
+    
+    const ok = await ensureModel();
+    if (!ok) return;
 
-  async function loadHistory() {
-    const all = await getAll<CodeAnalysis>(STORES.CODE);
-    setHistory(all.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
-  }
+    setIsAnalyzing(true);
+    setInsight('');
+    
+    const prompt = `Perform a high-level architectural and security review of this code. identify potential vulnerabilities or optimizations:\n\n${code}`;
 
-  async function analyzeCode() {
-    if (!code.trim()) return;
-    setIsProcessing(true);
-    setResult('');
     try {
-      let prompt = '';
-      switch (analysisType) {
-        case 'explain':
-          prompt = `Explain this ${language} code in simple terms:\n\n${code}`;
-          break;
-        case 'document':
-          prompt = `Generate documentation with JSDoc/docstrings for this ${language} code:\n\n${code}`;
-          break;
-        case 'review':
-          prompt = `Review this ${language} code for issues, complexity, and suggest improvements:\n\n${code}`;
-          break;
-        case 'test':
-          prompt = `Suggest unit test cases for this ${language} code:\n\n${code}`;
-          break;
-      }
-
-      const response = await generateText(prompt, { maxTokens: 600, temperature: 0.3 });
-      setResult(response.text);
-
-      const analysis: CodeAnalysis = {
-        id: generateId(),
-        code,
-        language,
-        type: analysisType,
-        result: response.text,
-        timestamp: Date.now(),
-      };
-      await create(STORES.CODE, analysis);
-      loadHistory();
+      await generateStreamingText(prompt, { temperature: 0.3 }, (token) => {
+        setInsight(prev => prev + token);
+      });
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setInsight('Analysis failed. Ensure local models are loaded.');
     } finally {
-      setIsProcessing(false);
+      setIsAnalyzing(false);
     }
-  }
+  };
 
   return (
-    <div className="code-v2-container">
-      {/* Pane 1: Global Nav Sidebar */}
-      <aside className="writing-nav-sidebar" style={{ width: '260px', minWidth: '260px' }}>
-        <div className="spectral-branding">
-          <div className="spectral-logo">🧠</div>
-          <div className="spectral-info">
-            <h3 style={{ fontSize: '13px', fontWeight: 800 }}>NovaMind</h3>
-            <span className="ai-status-badge">SPECTRAL ENGINE V2.4</span>
+    <div className="dossier-grid" style={{ background: 'var(--bg-midnight)' }}>
+      <aside style={{ padding: '48px 32px', borderRight: '1px solid var(--border-ghost)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ marginBottom: '64px' }}>
+          <span className="mono" style={{ fontSize: '10px', color: 'var(--accent-indigo)' }}>MODULE_SECTION</span>
+          <h3 style={{ fontSize: '24px', fontWeight: 600, marginTop: '8px' }}>Architecture Scan</h3>
+          <div className="mono" style={{ fontSize: '9px', marginTop: '8px', color: modelState === 'ready' ? 'var(--accent-indigo)' : 'var(--text-muted)' }}>
+            KERNEL_AST: {modelState.toUpperCase()}
           </div>
         </div>
 
-        <nav className="writing-nav-items" style={{ marginTop: '40px' }}>
-          <div className="nav-item-v2">
-            <span>🏠</span> Dashboard
-          </div>
-          <div className="nav-item-v2">
-            <span>📚</span> Learning
-          </div>
-          <div className="nav-item-v2">
-            <span>🛡️</span> Security
-          </div>
-          <div className="nav-item-v2">
-            <span>⚙️</span> Settings
-          </div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="mono" style={{ fontSize: '10px', opacity: 0.4, marginBottom: '16px' }}>ANALYSIS_PRESETS</span>
+          {['Security Audit', 'Performance Trace', 'Logic Review'].map(preset => (
+            <button key={preset} className="mono" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '12px 16px', textAlign: 'left', fontSize: '10px', cursor: 'pointer', transition: '0.2s', borderRadius: 'var(--radius-sm)' }}>
+              {preset}
+            </button>
+          ))}
         </nav>
 
-        <div style={{ marginTop: 'auto', padding: '20px' }}>
-             <button className="btn btn-primary" style={{ width: '100%', borderRadius: '12px', padding: '14px' }}>New Analysis</button>
-        </div>
-
-        <div className="writing-nav-footer">
-          <a href="#" className="nav-footer-link">
-            <span className="nav-footer-icon">?</span> Support
-          </a>
-          <a href="#" className="nav-footer-link">
-            <span className="nav-footer-icon">🚪</span> Logout
-          </a>
+        <div style={{ marginTop: 'auto', paddingTop: '32px', borderTop: '1px solid var(--border-ghost)' }}>
+           <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>SYSTEM_INTEGRITY</span>
+           <div className="mono" style={{ marginTop: '16px', fontSize: '10px', color: 'var(--accent-indigo)', fontWeight: 600 }}>[ SHIELD_ACTIVE ]</div>
         </div>
       </aside>
 
-      {/* Pane 2: Primary Editor Pane */}
-      <main className="code-main-pane">
-        <div className="meetings-title" style={{ marginBottom: '40px' }}>
-          <h1>Code Documentation Engine</h1>
-          <p>Real-time neural analysis and documentation generation via local WebGPU clusters.</p>
-        </div>
+      <main className="flex-column" style={{ padding: '0' }}>
+         <header style={{ padding: '32px clamp(24px, 5vw, 64px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--border-ghost)' }}>
+          <div>
+            <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>ACTIVE_SOURCE</span>
+            <h1 style={{ fontSize: '32px', marginTop: '8px' }}>Scratchpad.cc</h1>
+          </div>
+          <button 
+            onClick={runDiagnostic} 
+            disabled={isAnalyzing}
+            className="btn-premium" 
+            style={{ padding: '6px 16px', fontSize: '10px' }}
+          >
+            {isAnalyzing ? 'SCANNING...' : 'Run Diagnostic'}
+          </button>
+        </header>
 
-        <div className="lang-controls-row">
-           <div className="lang-control-card">
-              <div className="lang-control-label">💻 Language</div>
-              <select className="select-v2" value={language} onChange={(e) => setLanguage(e.target.value)}>
-                <option value="javascript">JavaScript</option>
-                <option value="typescript">TypeScript</option>
-                <option value="python">Python</option>
-                <option value="java">Java</option>
-                <option value="cpp">C++</option>
-              </select>
-           </div>
-           <div className="lang-control-card">
-              <div className="lang-control-label">🔍 Analysis Mode</div>
-              <select className="select-v2" value={analysisType} onChange={(e) => setAnalysisType(e.target.value as any)}>
-                <option value="explain">Explain Logic</option>
-                <option value="document">Generate JSDoc</option>
-                <option value="review">Code Review</option>
-                <option value="test">Unit Test Cases</option>
-              </select>
-           </div>
-           <div className="lang-control-card" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button 
-                className="btn btn-primary" 
-                style={{ width: '100%', borderRadius: '12px' }} 
-                onClick={analyzeCode} 
-                disabled={isProcessing || !code}
-              >
-                {isProcessing ? '⏳ Analyzing...' : '🔍 Neural Analysis'}
-              </button>
-           </div>
-        </div>
-
-        <div className="code-editor-v2">
+        <section style={{ flex: 1, padding: '0', background: '#050505', position: 'relative' }}>
           <textarea
-            className="notes-body-editor"
-            style={{ minHeight: '500px', fontFamily: '"JetBrains Mono", monospace', fontSize: '14px' }}
-            placeholder="// Paste or type your code here for spectral analysis..."
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            disabled={isProcessing}
+            disabled={isAnalyzing}
+            spellCheck={false}
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'none',
+              border: 'none',
+              padding: '32px',
+              color: 'var(--accent-indigo)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '14px',
+              lineHeight: 1.6,
+              outline: 'none',
+              resize: 'none'
+            }}
           />
+        </section>
+
+        <div className="glass-panel" style={{ margin: 'clamp(16px, 3vw, 32px)', padding: '24px', maxHeight: '200px', overflowY: 'auto' }}>
+           <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>AI_INSIGHT</span>
+           <p style={{ fontSize: '16px', color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginTop: '12px', fontWeight: 300 }}>
+             {insight}
+           </p>
         </div>
       </main>
 
-      {/* Pane 3: Intelligence Sidebar */}
-      <aside className="code-intel-pane">
-        <div className="privacy-card-title">ANALYSIS RESULT</div>
-        
-        {result ? (
-           <div className="ai-summary-card-v2" style={{ border: '1px solid #ff550033' }}>
-              <div className="neural-header">
-                <div className="neural-icon">⚡</div>
-                <div>
-                   <h4>Neural Output</h4>
-                   <span>SPECTRAL CLUSTER 7B</span>
-                </div>
-              </div>
-              <pre style={{ 
-                whiteSpace: 'pre-wrap', 
-                fontSize: '13px', 
-                lineHeight: '1.6', 
-                color: '#e2e8f0',
-                fontFamily: '"Inter", sans-serif'
-              }}>
-                {result}
-              </pre>
-           </div>
-        ) : (
-           <div className="module-empty">
-              <p style={{ fontSize: '12px', opacity: 0.5 }}>Neural output will appear here after analysis.</p>
-           </div>
-        )}
+      <aside style={{ padding: '48px 32px', borderLeft: '1px solid var(--border-ghost)' }}>
+         <h3 className="mono" style={{ color: 'var(--accent-indigo)', marginBottom: '40px', fontSize: '14px' }}>SYSTEM_CORE</h3>
+         
+         <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+            <div className="glass-panel" style={{ borderLeft: '2px solid var(--accent-indigo)' }}>
+               <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>VULNERABILITY_INDEX</span>
+               <div style={{ fontSize: '48px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '8px' }}>
+                 {isAnalyzing ? '--' : '0.0'}
+               </div>
+               <div className="mono" style={{ fontSize: '9px', color: 'var(--accent-indigo)', marginTop: '8px', fontWeight: 700 }}>ARCHITECTURAL_PARITY: VERIFIED</div>
+            </div>
 
-        <div className="privacy-card-title" style={{ marginTop: '40px' }}>ANALYSIS HISTORY</div>
-        <div className="pulse-metric-row">
-           {history.length === 0 && <p style={{ fontSize: '12px', opacity: 0.3, textAlign: 'center' }}>No recent history</p>}
-           {history.map((h) => (
-              <div key={h.id} className="pulse-metric-item" style={{ cursor: 'pointer' }} onClick={() => { setCode(h.code); setResult(h.result); }}>
-                 <div className="pulse-metric-info">
-                    <span className="pulse-metric-icon">📑</span>
-                    <div className="pulse-metric-label">
-                       <h4 style={{ fontSize: '12px' }}>{h.type.toUpperCase()}</h4>
-                       <p>{h.language}</p>
-                    </div>
-                 </div>
-                 <div className="pulse-metric-value" style={{ fontSize: '10px', opacity: 0.5 }}>
-                   {new Date(h.timestamp).toLocaleDateString()}
-                 </div>
-              </div>
-           ))}
-        </div>
+            <div style={{ paddingTop: '32px', borderTop: '1px solid var(--border-ghost)' }}>
+               <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>DEPENDENCY_MAP</span>
+               <div className="glass-panel" style={{ marginTop: '16px', padding: '24px' }}>
+                  <div style={{ height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                     <div className="mono" style={{ fontSize: '9px', color: 'var(--text-muted)' }}>[ ARCH_VIS_STABLE ]</div>
+                  </div>
+               </div>
+            </div>
+         </div>
       </aside>
     </div>
   );

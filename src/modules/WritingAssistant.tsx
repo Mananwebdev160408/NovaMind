@@ -1,428 +1,385 @@
-/**
- * Module 1: Smart Writing Assistant
- * Features: Multi-mode generation, tone transformer, autocomplete, expand/compress
- */
-
-import { useState, useEffect, useRef } from 'react';
-import { generateStreamingText, calculateReadabilityScore, countWords, detectPassiveVoice, detectFillerWords, generateId } from '../lib/ai-utils';
-import { create, update, getAll, STORES } from '../lib/storage';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useModelLoader } from '../hooks/useModelLoader';
-import { ModelCategory } from '../runanywhere';
-import type { WritingDocument, WritingMode, ToneType } from '../types';
+import { ModelCategory } from '@runanywhere/web';
+import { 
+  generateStreamingText, 
+  calculateReadabilityScore, 
+  countWords,
+  detectPassiveVoice,
+  detectFillerWords,
+} from '../lib/ai-utils';
+import { api } from '../lib/api';
+import { Button, Input, TextArea, Select, Badge, Toast, Card } from '../components/UI';
+
+interface Draft {
+  _id: string;
+  title: string;
+  content: string;
+  mode: string;
+  tone?: string;
+  wordCount?: number;
+  metrics?: any;
+}
+
+const TONES = [
+  { value: 'formal', label: 'Formal' },
+  { value: 'casual', label: 'Casual' },
+  { value: 'persuasive', label: 'Persuasive' },
+  { value: 'empathetic', label: 'Empathetic' },
+  { value: 'concise', label: 'Concise' },
+  { value: 'executive', label: 'Executive' },
+];
+
+const MODES = [
+  { value: 'document', label: 'Document' },
+  { value: 'email', label: 'Email' },
+  { value: 'blog', label: 'Blog Post' },
+  { value: 'creative', label: 'Creative Writing' },
+];
 
 export function WritingAssistant() {
-  const [documents, setDocuments] = useState<WritingDocument[]>([]);
-  const [currentDoc, setCurrentDoc] = useState<WritingDocument | null>(null);
-  const [mode, setMode] = useState<WritingMode>('document');
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [activeDraft, setActiveDraft] = useState<Draft | null>(null);
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('Untitled Document');
+  const [selectedMode, setSelectedMode] = useState('document');
+  const [selectedTone, setSelectedTone] = useState('formal');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showToneMenu, setShowToneMenu] = useState(false);
-  const [readabilityScore, setReadabilityScore] = useState(0);
-  const [wordCount, setWordCount] = useState(0);
-  const [passiveVoice, setPassiveVoice] = useState<string[]>([]);
-  const [fillerWords, setFillerWords] = useState<Array<{ word: string; count: number }>>([]);
-  const [showInsights, setShowInsights] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Use the model loader hook
+  const [streamingText, setStreamingText] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  
   const { state: modelState, ensure: ensureModel } = useModelLoader(ModelCategory.Language);
-  const isModelReady = modelState === 'ready';
+
+  // Metrics
+  const words = countWords(content);
+  const readability = Math.round(calculateReadabilityScore(content));
+  const passiveCount = detectPassiveVoice(content).length;
+  const fillerWords = detectFillerWords(content);
 
   useEffect(() => {
-    loadDocuments();
-    ensureModel(); // Load model on mount
-  }, [ensureModel]);
+    loadDrafts();
+  }, []);
 
-  useEffect(() => {
-    // Calculate writing metrics
-    if (content) {
-      setReadabilityScore(calculateReadabilityScore(content));
-      setWordCount(countWords(content));
-      setPassiveVoice(detectPassiveVoice(content));
-      setFillerWords(detectFillerWords(content));
-    } else {
-      setReadabilityScore(0);
-      setWordCount(0);
-      setPassiveVoice([]);
-      setFillerWords([]);
+  const loadDrafts = async () => {
+    try {
+      const data = await api.get('/writing');
+      setDrafts(data);
+      if (data.length > 0 && !activeDraft) {
+        const first = data[0];
+        setActiveDraft(first);
+        setContent(first.content || '');
+        setTitle(first.title || 'Untitled Document');
+        setSelectedMode(first.mode || 'document');
+      }
+    } catch (err) {
+      console.error('Failed to load drafts:', err);
+      setToast({ message: 'Failed to load documents', type: 'error' });
     }
-  }, [content]);
+  };
 
-  async function loadDocuments() {
-    const docs = await getAll<WritingDocument>(STORES.WRITING);
-    setDocuments(docs.sort((a, b) => b.updatedAt - a.updatedAt));
-  }
+  const handleSave = async () => {
+    try {
+      const data = {
+        title,
+        content,
+        mode: selectedMode,
+        tone: selectedTone,
+        metrics: { wordCount: words, readabilityScore: readability, passiveVoiceCount: passiveCount },
+      };
 
-  async function saveDocument() {
-    if (!content.trim()) return;
+      if (activeDraft?._id) {
+        await api.put(`/writing/${activeDraft._id}`, data);
+        setToast({ message: 'Document saved successfully', type: 'success' });
+      } else {
+        const newDraft = await api.post('/writing', data);
+        setActiveDraft(newDraft);
+        setToast({ message: 'Document created successfully', type: 'success' });
+      }
+      loadDrafts();
+    } catch (err) {
+      console.error('Save failed:', err);
+      setToast({ message: 'Failed to save document', type: 'error' });
+    }
+  };
 
-    const doc: WritingDocument = currentDoc
-      ? {
-          ...currentDoc,
-          content,
-          updatedAt: Date.now(),
-          wordCount: countWords(content),
-          readabilityScore: calculateReadabilityScore(content),
+  const handleAIAction = async (action: string) => {
+    if (isGenerating || !content) return;
+    
+    setIsGenerating(true);
+    setStreamingText('');
+    
+    try {
+      await ensureModel();
+      
+      let prompt = '';
+      let systemPrompt = '';
+
+      switch (action) {
+        case 'transform-tone':
+          systemPrompt = `You are a professional writing assistant. Transform the following text to have a ${selectedTone} tone while preserving the core message.`;
+          prompt = content;
+          break;
+        case 'summarize':
+          systemPrompt = 'You are a professional writing assistant. Create a concise summary (2-3 sentences) of the following text.';
+          prompt = content;
+          break;
+        case 'expand':
+          systemPrompt = 'You are a professional writing assistant. Expand the following text with more details, examples, and explanations while maintaining the same tone.';
+          prompt = content;
+          break;
+        case 'improve':
+          systemPrompt = 'You are a professional writing assistant. Improve the following text by fixing grammar, enhancing clarity, and strengthening the language.';
+          prompt = content;
+          break;
+        case 'continue':
+          systemPrompt = `You are a professional ${selectedMode} writer. Continue writing from where the text ends, maintaining the same style and tone.`;
+          prompt = content;
+          break;
+      }
+
+      const result = await generateStreamingText(
+        prompt,
+        { systemPrompt, temperature: 0.7, maxTokens: 500 },
+        (token) => {
+          setStreamingText(prev => prev + token);
         }
-      : {
-          id: generateId(),
-          title: content.slice(0, 50).trim() || 'Untitled Document',
-          content,
-          mode,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          wordCount: countWords(content),
-          readabilityScore: calculateReadabilityScore(content),
-          versions: [],
-        };
+      );
 
-    if (currentDoc) {
-      await update(STORES.WRITING, doc);
-    } else {
-      await create(STORES.WRITING, doc);
+      if (action === 'continue') {
+        setContent(content + '\n\n' + result.text);
+      } else {
+        setContent(result.text);
+      }
+      
+      setToast({ message: 'AI generation complete', type: 'success' });
+    } catch (err) {
+      console.error('AI action failed:', err);
+      setToast({ message: 'AI generation failed. Make sure models are loaded.', type: 'error' });
+    } finally {
+      setIsGenerating(false);
+      setStreamingText('');
     }
+  };
 
-    setCurrentDoc(doc);
-    loadDocuments();
-  }
-
-  function newDocument() {
-    setCurrentDoc(null);
+  const handleNewDocument = () => {
+    setActiveDraft(null);
     setContent('');
-  }
+    setTitle('Untitled Document');
+    setSelectedMode('document');
+  };
 
-  async function generateText(prompt: string) {
-    setIsGenerating(true);
-    try {
-      const systemPrompt = getModeSystemPrompt(mode);
-      await generateStreamingText(
-        prompt,
-        { maxTokens: 500, temperature: 0.7, systemPrompt },
-        (token) => {
-          setContent((prev) => prev + token);
-        }
-      );
-    } catch (error) {
-      console.error('Generation error:', error);
-      alert('Error generating text. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function transformTone(tone: ToneType) {
-    if (!content.trim()) return;
-
-    setIsGenerating(true);
-    setShowToneMenu(false);
-
-    try {
-      const prompt = `Rewrite the following text in a ${tone} tone. Keep the meaning the same but adjust the style:\n\n${content}`;
-      const systemPrompt = `You are an expert writing assistant specializing in tone transformation. Output ONLY the rewritten text, no explanations.`;
-
-      let newContent = '';
-      await generateStreamingText(
-        prompt,
-        { maxTokens: 800, temperature: 0.7, systemPrompt },
-        (token) => {
-          newContent += token;
-        }
-      );
-
-      setContent(newContent);
-    } catch (error) {
-      console.error('Tone transformation error:', error);
-      alert('Error transforming tone. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function expandText() {
-    const selection = getSelectedText();
-    if (!selection) {
-      alert('Please select text to expand');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const prompt = `Expand the following text into a more detailed version with additional context and examples. Keep the core meaning:\n\n${selection}`;
-      const systemPrompt = 'You are a writing assistant. Expand the text naturally and thoroughly.';
-
-      let expanded = '';
-      await generateStreamingText(
-        prompt,
-        { maxTokens: 600, temperature: 0.7, systemPrompt },
-        (token) => {
-          expanded += token;
-        }
-      );
-
-      replaceSelection(expanded);
-    } catch (error) {
-      console.error('Expand error:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function compressText() {
-    const selection = getSelectedText();
-    if (!selection) {
-      alert('Please select text to compress');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const prompt = `Compress the following text into a single concise sentence while keeping the key point:\n\n${selection}`;
-      const systemPrompt = 'You are a writing assistant. Be extremely concise.';
-
-      let compressed = '';
-      await generateStreamingText(
-        prompt,
-        { maxTokens: 100, temperature: 0.5, systemPrompt },
-        (token) => {
-          compressed += token;
-        }
-      );
-
-      replaceSelection(compressed);
-    } catch (error) {
-      console.error('Compress error:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  function getSelectedText(): string {
-    if (!textareaRef.current) return '';
-    const start = textareaRef.current.selectionStart;
-    const end = textareaRef.current.selectionEnd;
-    return content.substring(start, end);
-  }
-
-  function replaceSelection(newText: string) {
-    if (!textareaRef.current) return;
-    const start = textareaRef.current.selectionStart;
-    const end = textareaRef.current.selectionEnd;
-    const before = content.substring(0, start);
-    const after = content.substring(end);
-    setContent(before + newText + after);
-  }
+  const handleSelectDraft = (draft: Draft) => {
+    setActiveDraft(draft);
+    setContent(draft.content || '');
+    setTitle(draft.title || 'Untitled Document');
+    setSelectedMode(draft.mode || 'document');
+  };
 
   return (
-    <div className="writing-v2-container">
-      {/* Left Navigation Sidebar */}
-      <aside className="writing-nav-sidebar">
-        <div className="spectral-brand">
-          <div className="spectral-logo">🧠</div>
-          <div className="spectral-info">
-            <h3>Spectral Engine</h3>
-            <span>V4.2 ACTIVE</span>
-          </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 320px', height: 'calc(100vh - 72px)', background: 'var(--bg-midnight)' }}>
+      {/* Sidebar */}
+      <aside style={{ borderRight: '1px solid var(--border-ghost)', padding: '32px 24px', overflowY: 'auto' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <span className="mono" style={{ fontSize: '10px', color: 'var(--accent-indigo)' }}>WRITING_MODULE</span>
+          <h3 style={{ fontSize: '20px', fontWeight: 600, marginTop: '8px' }}>Cognitive Drafting</h3>
+          <Badge variant={modelState === 'ready' ? 'success' : 'warning'} style={{ marginTop: '12px' }}>
+            AI: {modelState.toUpperCase()}
+          </Badge>
         </div>
 
-        <button className="btn-new-draft" onClick={newDocument}>
-          + New Draft
-        </button>
+        <Button variant="primary" size="md" style={{ width: '100%', marginBottom: '24px' }} onClick={handleNewDocument}>
+          + New Document
+        </Button>
 
-        <nav className="writing-nav-items">
-          <div className="nav-item-v2 active">
-            <span>✍️</span> Writer
+        <div>
+          <span className="mono" style={{ fontSize: '9px', opacity: 0.4, display: 'block', marginBottom: '12px' }}>
+            YOUR_DOCUMENTS
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {drafts.map(draft => (
+              <Card
+                key={draft._id}
+                hoverable
+                onClick={() => handleSelectDraft(draft)}
+                style={{
+                  padding: '12px 16px',
+                  background: activeDraft?._id === draft._id ? 'var(--accent-glow)' : 'var(--bg-surface)',
+                  border: activeDraft?._id === draft._id ? '1px solid var(--accent-indigo)' : '1px solid var(--border-ghost)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>
+                  {draft.title}
+                </div>
+                <div className="mono" style={{ fontSize: '9px', color: 'var(--text-dim)' }}>
+                  {draft.wordCount || 0} words • {draft.mode}
+                </div>
+              </Card>
+            ))}
           </div>
-          <div className="nav-item-v2" onClick={() => setShowInsights(!showInsights)}>
-            <span>📊</span> Neural Insights
-          </div>
-        </nav>
-
-        <div className="writing-nav-footer">
-          <a href="#" className="nav-footer-link">
-            <span className="nav-footer-icon">?</span> Support
-          </a>
-          <a href="#" className="nav-footer-link">
-            <span className="nav-footer-icon code">{'<>'}</span> API
-          </a>
         </div>
       </aside>
 
-      {/* Main Editor Section */}
-      <main className="writing-editor-main">
-        <div className="writing-top-bar">
-          <div className="writing-title-area">
-            <h2>Writing Assistant</h2>
-            <span className="gpu-badge">WEBGPU ENABLED</span>
-          </div>
-          <div className="writing-top-actions">
-            <button className="btn btn-sm btn-primary" onClick={saveDocument} disabled={isGenerating || !content}>
-              💾 Save
-            </button>
-            <button className="btn btn-sm btn-outline" onClick={expandText} disabled={isGenerating || !isModelReady}>
-              ➕ Expand
-            </button>
-            <button className="btn btn-sm btn-outline" onClick={compressText} disabled={isGenerating || !isModelReady}>
-              ➖ Compress
-            </button>
-            <button className="btn btn-sm btn-outline" onClick={() => setShowToneMenu(!showToneMenu)}>
-              🎭 Transform Tone ▾
-            </button>
-            <div className="toggle-group">
-              <span>Show Insights</span>
-              <input 
-                type="checkbox" 
-                checked={showInsights} 
-                onChange={() => setShowInsights(!showInsights)}
-                style={{ cursor: 'pointer' }}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Main Editor */}
+      <main style={{ padding: '32px', overflowY: 'auto' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Document title..."
+            style={{ fontSize: '24px', fontWeight: 600, border: 'none', background: 'transparent', padding: '0 0 16px 0', marginBottom: '24px' }}
+          />
 
-        <div className="editor-surface">
-          <div className="editor-container-v2">
-            <div className="editor-breadcrumb">
-              DRAFTING • {currentDoc?.title || 'MY NEW PROJECT'}
-            </div>
-            <input
-              className="editor-heading-v2"
-              placeholder="The Neural Interface Revolution"
-              value={currentDoc?.title || ''}
-              onChange={(e) => {
-                if (currentDoc) {
-                  setCurrentDoc({ ...currentDoc, title: e.target.value });
-                }
-              }}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+            <Select
+              label="MODE"
+              options={MODES}
+              value={selectedMode}
+              onChange={(e) => setSelectedMode(e.target.value)}
             />
-            <textarea
-              ref={textareaRef}
-              className="editor-body-v2"
-              placeholder="Start writing your thoughts here..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              disabled={isGenerating}
+            <Select
+              label="TONE"
+              options={TONES}
+              value={selectedTone}
+              onChange={(e) => setSelectedTone(e.target.value)}
             />
           </div>
 
-          {/* Floating Prompt Bar */}
-          <div className="writing-v2-prompt-bar">
-            <div className="prompt-input-row">
-              <span className="prompt-icon">✨</span>
-              <input
-                className="prompt-input-v2"
-                placeholder="Describe what you want to write..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                    generateText(e.currentTarget.value);
-                    e.currentTarget.value = '';
-                  }
-                }}
-                disabled={isGenerating || !isModelReady}
-              />
-              <button
-                className="btn-generate-v2"
-                onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  if (input.value.trim()) {
-                    generateText(input.value);
-                    input.value = '';
-                  }
-                }}
-                disabled={isGenerating || !isModelReady}
-              >
-                {isGenerating ? '⏳' : 'Generate >'}
-              </button>
+          <TextArea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Start writing your masterpiece..."
+            style={{ 
+              minHeight: '400px', 
+              fontSize: '16px', 
+              lineHeight: '1.8',
+              border: '1px solid var(--border-ghost)',
+              background: 'var(--bg-deep)',
+            }}
+          />
+
+          {streamingText && (
+            <div style={{ 
+              marginTop: '16px', 
+              padding: '16px', 
+              background: 'var(--accent-glow)', 
+              border: '1px solid var(--accent-indigo)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '14px',
+              lineHeight: '1.6',
+            }}>
+              <div className="mono" style={{ fontSize: '10px', marginBottom: '8px', color: 'var(--accent-indigo)' }}>
+                AI_GENERATING...
+              </div>
+              {streamingText}
             </div>
-            <div className="prompt-footer-v2">
-              <div className="prompt-info-tag">⚡ Ultra Low Latency</div>
-              <div className="prompt-info-tag">🔒 Privacy Focused</div>
-            </div>
+          )}
+
+          <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <Button variant="primary" onClick={handleSave} disabled={isGenerating}>
+              Save Document
+            </Button>
+            <Button variant="secondary" onClick={() => handleAIAction('improve')} disabled={isGenerating || !content} loading={isGenerating}>
+              Improve Writing
+            </Button>
+            <Button variant="secondary" onClick={() => handleAIAction('transform-tone')} disabled={isGenerating || !content} loading={isGenerating}>
+              Transform Tone
+            </Button>
+            <Button variant="ghost" onClick={() => handleAIAction('continue')} disabled={isGenerating || !content} loading={isGenerating}>
+              Continue Writing
+            </Button>
           </div>
         </div>
       </main>
 
-      {/* Right Insights Sidebar */}
-      {showInsights && (
-        <aside className="writing-insights-sidebar">
-          <div className="insights-section">
-            <span className="insights-label">INTELLIGENCE METRICS</span>
-            <div className="metric-v2">
-              <div className="metric-v2-header">
-                <span>Clarity</span>
-                <span>{readabilityScore.toFixed(0)}%</span>
-              </div>
-              <div className="metric-v2-bar">
-                <div 
-                  className="metric-v2-fill" 
-                  style={{ width: `${Math.min(readabilityScore, 100)}%` }}
-                ></div>
-              </div>
-            </div>
-            <div className="metric-v2">
-              <div className="metric-v2-header">
-                <span>Sentiment</span>
-                <span style={{ color: 'var(--primary)' }}>Analytic</span>
-              </div>
-              <div className="metric-v2-bar">
-                <div className="metric-v2-fill" style={{ width: '70%', background: 'var(--primary)' }}></div>
-              </div>
-            </div>
-          </div>
+      {/* Right Panel: Metrics & Actions */}
+      <aside style={{ borderLeft: '1px solid var(--border-ghost)', padding: '32px 24px', overflowY: 'auto' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <span className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block', marginBottom: '16px' }}>
+            METRICS
+          </span>
+          
+          <Card style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--accent-indigo)' }}>{words}</div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>WORD_COUNT</div>
+          </Card>
 
-          <div className="insights-section">
-            <div className="metric-cards-row">
-              <div className="metric-card-v2">
-                <div className="metric-card-label">Words</div>
-                <div className="metric-card-value">{wordCount.toLocaleString()}</div>
-              </div>
-              <div className="metric-card-v2">
-                <div className="metric-card-label">Read Time</div>
-                <div className="metric-card-value">{Math.ceil(wordCount / 200)}m</div>
-              </div>
+          <Card style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '32px', fontWeight: 700, color: readability >= 60 ? '#22c55e' : readability >= 40 ? '#fb923c' : '#ef4444' }}>
+              {readability}
             </div>
-          </div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>READABILITY_SCORE</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+              {readability >= 60 ? 'Easy to read' : readability >= 40 ? 'Moderate' : 'Difficult'}
+            </div>
+          </Card>
 
-          <div className="insights-section">
-            <span className="insights-label">AI SUGGESTIONS</span>
-            <div className="ai-suggestion-card">
-              <div className="suggestion-type">✨ Better Flow</div>
-              <div className="suggestion-text-v2">
-                Consider merging the first two paragraphs to maintain a stronger narrative momentum.
-              </div>
+          <Card style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '32px', fontWeight: 700, color: passiveCount === 0 ? '#22c55e' : passiveCount < 3 ? '#fb923c' : '#ef4444' }}>
+              {passiveCount}
             </div>
-            <div className="vocab-card">
-              <div className="suggestion-type">📖 Vocabulary</div>
-              <div className="suggestion-text-v2">
-                "Paradigm shift" is used frequently. Try "Fundamental reconfiguration".
-              </div>
-            </div>
-          </div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>PASSIVE_VOICE</div>
+          </Card>
 
-          <div className="engine-load-visual">
-            <div className="engine-load-label">
-              <span>Engine Load</span>
-              <span style={{ color: 'var(--green)' }}>Minimal</span>
-            </div>
-            <div className="metric-v2-bar">
-              <div className="metric-v2-fill" style={{ width: '15%', background: 'var(--green)' }}></div>
-            </div>
-          </div>
-        </aside>
-      )}
+          {fillerWords.length > 0 && (
+            <Card>
+              <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                FILLER_WORDS
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {fillerWords.slice(0, 5).map(fw => (
+                  <Badge key={fw.word} variant="warning">
+                    {fw.word}: {fw.count}
+                  </Badge>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        <div>
+          <span className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block', marginBottom: '16px' }}>
+            AI_ACTIONS
+          </span>
+          
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            style={{ width: '100%', marginBottom: '8px' }}
+            onClick={() => handleAIAction('summarize')}
+            disabled={isGenerating || !content}
+            loading={isGenerating}
+          >
+            Summarize
+          </Button>
+          
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            style={{ width: '100%', marginBottom: '8px' }}
+            onClick={() => handleAIAction('expand')}
+            disabled={isGenerating || !content}
+            loading={isGenerating}
+          >
+            Expand Text
+          </Button>
+
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            style={{ width: '100%' }}
+            onClick={() => {
+              navigator.clipboard.writeText(content);
+              setToast({ message: 'Copied to clipboard', type: 'success' });
+            }}
+            disabled={!content}
+          >
+            Copy to Clipboard
+          </Button>
+        </div>
+      </aside>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
-}
-
-function getModeSystemPrompt(mode: WritingMode): string {
-  switch (mode) {
-    case 'email':
-      return 'You are a professional email writing assistant. Write clear, concise, and appropriate emails.';
-    case 'blog':
-      return 'You are a blog writing assistant. Write engaging, informative blog posts with good structure.';
-    case 'creative':
-      return 'You are a creative writing assistant. Write imaginative, vivid, and compelling prose.';
-    case 'document':
-    default:
-      return 'You are a professional document writing assistant. Write clear, well-structured documents.';
-  }
 }

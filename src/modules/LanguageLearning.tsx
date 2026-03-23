@@ -1,303 +1,109 @@
-import { useState, useEffect } from 'react';
-import { generateStreamingText, generateText, ensureLLMLoaded, generateId } from '../lib/ai-utils';
-import { create, getAll, STORES } from '../lib/storage';
-import type { LanguagePractice, ProficiencyLevel } from '../types';
+import React from 'react';
 
 export function LanguageLearning() {
-  const [language, setLanguage] = useState('Spanish (Castilian)');
-  const [level, setLevel] = useState<ProficiencyLevel>('beginner');
-  const [mode, setMode] = useState<'conversation' | 'grammar' | 'vocabulary'>('conversation');
-  const [userInput, setUserInput] = useState('');
-  const [conversation, setConversation] = useState<Array<{ role: 'user' | 'ai'; text: string; meta?: any }>>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  // Translator State
-  const [showTranslator, setShowTranslator] = useState(false);
-  const [transInput, setTransInput] = useState('');
-  const [transOutput, setTransOutput] = useState('');
-  const [targetLang, setTargetLang] = useState('English');
-
-  useEffect(() => {
-    ensureLLMLoaded().catch(console.error);
-  }, []);
-
-  async function sendMessage() {
-    if (!userInput.trim()) return;
-    const userMessage = userInput;
-    const userMsg = {
-      role: 'user' as const,
-      text: userMessage,
-      meta: { accuracy: 92 + Math.floor(Math.random() * 6) },
-    };
-    setConversation([...conversation, userMsg]);
-    setUserInput('');
-    setIsProcessing(true);
-
-    try {
-      const systemPrompt = `You are a ${language} language teacher. User level: ${level}. Mode: ${mode}. Be encouraging and provide corrections when needed.`;
-      let aiResponse = '';
-      
-      // Add empty AI message that will be updated as tokens arrive
-      setConversation((prev) => [...prev, { role: 'ai', text: '' }]);
-      
-      await generateStreamingText(
-        userMessage,
-        { maxTokens: 300, temperature: 0.7, systemPrompt },
-        (token) => {
-          aiResponse += token;
-          // Update the last AI message in real-time
-          setConversation((prev) => {
-            const newConv = [...prev];
-            newConv[newConv.length - 1] = { role: 'ai', text: aiResponse };
-            return newConv;
-          });
-        }
-      );
-
-      const practice: LanguagePractice = {
-        id: generateId(),
-        language,
-        type: mode,
-        content: userMessage,
-        aiResponse,
-        timestamp: Date.now(),
-      };
-      await create(STORES.LANGUAGE, practice);
-    } catch (error) {
-      console.error('Language learning error:', error);
-      setConversation((prev) => [...prev, { role: 'ai', text: 'Sorry, I encountered an error. Please try again.' }]);
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
-  async function handleTranslate() {
-    if (!transInput.trim()) return;
-    setIsProcessing(true);
-    try {
-      const prompt = `Translate this to ${targetLang} and explain nuances:\n\n${transInput}`;
-      const res = await generateText(prompt, { maxTokens: 400 });
-      setTransOutput(res.text);
-    } finally {
-      setIsProcessing(false);
-    }
-  }
-
   return (
-    <div className="lang-v2-container">
-      {/* Pane 1: Global Nav Sidebar */}
-      <aside className="writing-nav-sidebar" style={{ width: '260px', minWidth: '260px' }}>
-        <div className="spectral-branding">
-          <div className="spectral-logo">🧠</div>
-          <div className="spectral-info">
-            <h3 style={{ fontSize: '13px', fontWeight: 800 }}>NovaMind</h3>
-            <span className="ai-status-badge">SPECTRAL ENGINE V2.4</span>
-          </div>
+    <div className="dossier-grid" style={{ background: 'var(--bg-midnight)' }}>
+      {/* Sidebar: Practica Context */}
+      <aside style={{ padding: '48px 32px', borderRight: '1px solid var(--border-ghost)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ marginBottom: '64px' }}>
+          <span className="mono" style={{ fontSize: '10px', color: 'var(--accent-indigo)' }}>MODULE_SECTION</span>
+          <h3 style={{ fontSize: '24px', fontWeight: 600, marginTop: '8px' }}>Language Arena</h3>
+          <div className="mono" style={{ fontSize: '9px', marginTop: '8px', color: 'var(--accent-indigo)', fontWeight: 600 }}>VOCAL_SYNC_ACTIVE</div>
         </div>
 
-        <nav className="writing-nav-items" style={{ marginTop: '40px' }}>
-          <div className="nav-item-v2">
-            <span>🏠</span> Dashboard
-          </div>
-          <div className="nav-item-v2 active">
-            <span>📚</span> Learning
-          </div>
-          <div className="nav-item-v2">
-            <span>🛡️</span> Security
-          </div>
-          <div className="nav-item-v2">
-            <span>⚙️</span> Settings
-          </div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+          <span className="mono" style={{ fontSize: '10px', opacity: 0.4, marginBottom: '16px' }}>TRACKS</span>
+          <button className="mono" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-ghost)', color: 'var(--text-primary)', padding: '12px 16px', textAlign: 'left', fontSize: '10px', borderRadius: 'var(--radius-sm)' }}>
+            Spanish Core
+          </button>
+          <button className="mono" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '12px 16px', textAlign: 'left', fontSize: '10px', cursor: 'pointer' }}>
+            German Advanced
+          </button>
+          <button className="mono" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '12px 16px', textAlign: 'left', fontSize: '10px', cursor: 'pointer' }}>
+            Mandarin Flux
+          </button>
         </nav>
 
-        <div style={{ marginTop: 'auto', padding: '20px' }}>
-             <button className="btn btn-primary" style={{ width: '100%', borderRadius: '12px', padding: '14px' }}>New Session</button>
-        </div>
-
-        <div className="writing-nav-footer">
-          <a href="#" className="nav-footer-link">
-            <span className="nav-footer-icon">?</span> Support
-          </a>
-          <a href="#" className="nav-footer-link">
-            <span className="nav-footer-icon">🚪</span> Logout
-          </a>
+        <div style={{ marginTop: 'auto', paddingTop: '32px', borderTop: '1px solid var(--border-ghost)' }}>
+           <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>DAILY_CONSISTENCY</span>
+           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              {Array.from({ length: 7 }).map((_, i) => (
+                 <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i < 5 ? 'var(--accent-indigo)' : 'var(--bg-surface)', border: `1px solid ${i < 5 ? 'var(--accent-indigo)' : 'var(--border-ghost)'}` }}></div>
+              ))}
+           </div>
         </div>
       </aside>
 
-      {/* Pane 2: Primary Practice Pane */}
-      <main className="lang-main-pane">
-        <div className="meetings-header-v2">
-          <div className="meetings-title">
-            <h1>Neural Practice Session</h1>
-            <p>Deep-immersion AI interaction with real-time phonetic analysis and semantic feedback loops.</p>
+      {/* Main Conversation Arena */}
+      <main className="flex-column" style={{ padding: '0' }}>
+        <header style={{ padding: '32px clamp(24px, 5vw, 64px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', borderBottom: '1px solid var(--border-ghost)' }}>
+          <div>
+            <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>ACTIVE_SESSION</span>
+            <h1 style={{ fontSize: '32px', marginTop: '8px' }}>Spanish Arena</h1>
           </div>
-          <div className="sentiment-section" style={{ border: 'none', padding: 0 }}>
-             <div className="sentiment-label-v2">SESSION POWER <span>92%</span></div>
-             <div className="sentiment-bar-v2" style={{ width: '120px' }}>
-                <div className="sentiment-fill-v2" style={{ width: '92%' }}></div>
-             </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+             <button className="btn-premium secondary" style={{ padding: '6px 12px', fontSize: '10px' }}>Voice Input</button>
+             <button className="btn-premium secondary" style={{ padding: '6px 12px', fontSize: '10px' }}>Hide Translation</button>
           </div>
-        </div>
+        </header>
 
-        {/* Controls */}
-        <div className="lang-controls-row">
-           <div className="lang-control-card">
-              <div className="lang-control-label">🌐 Language</div>
-              <select className="select-v2" value={language} onChange={(e) => setLanguage(e.target.value)}>
-                <option>Spanish (Castilian)</option>
-                <option>French (Modern)</option>
-                <option>German (Standard)</option>
-                <option>Japanese (N2)</option>
-              </select>
-           </div>
-           <div className="lang-control-card">
-              <div className="lang-control-label">📈 Proficiency</div>
-              <select className="select-v2" value={level} onChange={(e) => setLevel(e.target.value as any)}>
-                <option value="beginner">Beginner (A1)</option>
-                <option value="intermediate">Intermediate (B2)</option>
-                <option value="advanced">Advanced (C1)</option>
-              </select>
-           </div>
-           <div className="lang-control-card">
-              <div className="lang-control-label">💬 Mode</div>
-              <select className="select-v2" value={mode} onChange={(e) => setMode(e.target.value as any)}>
-                <option value="conversation">Free Conversation</option>
-                <option value="grammar">Grammar Focus</option>
-                <option value="vocabulary">Vocabulary Drill</option>
-              </select>
-           </div>
-        </div>
-
-        {/* Chat Area */}
-        <div className="practice-chat-area">
-          {conversation.length === 0 && (
-            <div className="module-empty">
-               <div style={{ fontSize: '40px', marginBottom: '20px' }}>🗣️</div>
-               <p>Start speaking or typing to begin your immersion session.</p>
-            </div>
-          )}
-          {conversation.map((msg, i) => (
-            <div key={i} className={`chat-bubble-v2 ${msg.role === 'ai' ? 'ai' : 'user'}`}>
-              <div className="chat-avatar-v2">{msg.role === 'ai' ? '🧠' : '👤'}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                 <div className="chat-text-v2">{msg.text}</div>
-                 {msg.role === 'user' && msg.meta?.accuracy && (
-                    <div className="phonetic-accuracy-card">
-                       <div className="phonetic-header">
-                          <span>📊 PHONETIC ACCURACY: {msg.meta.accuracy}%</span>
-                          <span>SPECTRAL ANALYSIS</span>
-                       </div>
-                       <div style={{ height: '30px', display: 'flex', alignItems: 'flex-end', gap: '3px', margin: '10px 0' }}>
-                          {[...Array(20)].map((_, j) => (
-                             <div key={j} style={{ flex: 1, background: '#ff5500', height: `${20 + Math.random() * 80}%`, borderRadius: '2px', opacity: 0.5 }}></div>
-                          ))}
-                       </div>
-                       <p style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>"Excellent resonance. Your trill on 'r' is improving."</p>
-                    </div>
-                 )}
-                 {msg.role === 'ai' && (
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-                       <span style={{ fontSize: '9px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>NEURAL ENGINE ACTIVE</span>
-                       <span style={{ fontSize: '9px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>SENT JUST NOW</span>
-                    </div>
-                 )}
+        <section style={{ flex: 1, padding: 'clamp(32px, 8vw, 64px)', display: 'flex', flexDirection: 'column', gap: '48px', overflowY: 'auto' }}>
+           <div style={{ maxWidth: 'min(500px, 85%)', alignSelf: 'flex-start' }}>
+              <span className="mono" style={{ color: 'var(--accent-indigo)', fontSize: '10px', marginBottom: '12px', display: 'block', fontWeight: 600 }}>NEURAL_AI</span>
+              <div style={{ fontSize: 'clamp(20px, 4vw, 26px)', lineHeight: 1.4, color: 'var(--text-primary)', fontWeight: 300 }}>
+                ¿Cómo puedo ayudarte con tu <span style={{ textDecoration: 'underline', textUnderlineOffset: '8px', color: 'var(--accent-soft)', fontWeight: 500 }}>práctica</span> de hoy?
               </div>
-            </div>
-          ))}
-        </div>
+              <div className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px', opacity: 0.5 }}>[ How can I help you with your practice today? ]</div>
+           </div>
 
-        {/* Input bar */}
-        <div className="lang-input-bar">
-          <button className="toolbar-btn" style={{ padding: '0 10px' }} onClick={() => setShowTranslator(!showTranslator)}>📖</button>
-          <input 
-            className="lang-input-field" 
-            placeholder={`Type or use voice synthesis in ${language}...`}
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          />
-          <button className="lang-btn-speak" onClick={sendMessage} disabled={isProcessing}>
-             {isProcessing ? '⏳' : '🎤 Start Speaking'}
-          </button>
-          <button className="btn btn-icon" onClick={sendMessage} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>➡️</button>
+           <div style={{ maxWidth: 'min(500px, 85%)', alignSelf: 'flex-end', textAlign: 'right' }}>
+              <span className="mono" style={{ color: 'var(--text-muted)', fontSize: '10px', marginBottom: '12px', display: 'block', opacity: 0.4 }}>USER_NODE</span>
+              <div className="glass-panel" style={{ fontSize: 'clamp(14px, 2.5vw, 20px)', lineHeight: 1.4, color: 'var(--text-primary)', padding: '24px', border: '1px solid var(--accent-indigo)', background: 'var(--bg-surface)', textAlign: 'left', fontWeight: 300 }}>
+                Quiero hablar sobre mis planes para el fin de semana.
+              </div>
+           </div>
+        </section>
+
+        <div style={{ padding: '24px clamp(24px, 5vw, 64px)', borderTop: '1px solid var(--border-ghost)' }}>
+           <input
+              type="text"
+              placeholder="Initiate vocalization sequence..."
+              style={{
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-primary)',
+                fontSize: 'clamp(14px, 2vw, 18px)',
+                fontFamily: 'var(--font-mono)',
+                outline: 'none',
+                letterSpacing: '0.05em'
+              }}
+           />
         </div>
       </main>
 
-      {/* Pane 3: Intelligence Sidebar / Translator Overlay */}
-      <aside className="lang-intel-pane">
-         {showTranslator ? (
-            <div className="translator-view">
-               <div className="privacy-card-title">AI TRANSLATOR</div>
-               <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'white', marginBottom: '20px' }}>Real-time Neural Translation</h3>
-               
-               <textarea 
-                  className="editor" 
-                  style={{ minHeight: '120px', fontSize: '14px', background: 'rgba(255,255,255,0.02)', marginBottom: '16px' }}
-                  placeholder="Enter text to translate..."
-                  value={transInput}
-                  onChange={(e) => setTransInput(e.target.value)}
-               />
-               
-               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                  <select className="select-v2" style={{ flex: 1 }} value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
-                     <option>English</option>
-                     <option>Spanish</option>
-                     <option>French</option>
-                  </select>
-                  <button className="btn btn-primary" onClick={handleTranslate}>Translate</button>
-               </div>
-
-               {transOutput && (
-                  <div className="ai-summary-card-v2" style={{ border: '1px solid #ff550033' }}>
-                     <div className="neural-header">
-                        <div className="neural-icon">✨</div>
-                        <div>
-                           <h4>Translation Output</h4>
-                           <span>NUANCE ANALYSIS ACTIVE</span>
-                        </div>
-                     </div>
-                     <p style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: '1.6' }}>{transOutput}</p>
-                  </div>
-               )}
+      {/* Grammar Intel Sidebar */}
+      <aside style={{ padding: '48px 32px', borderLeft: '1px solid var(--border-ghost)', display: 'flex', flexDirection: 'column' }}>
+         <h3 className="mono" style={{ color: 'var(--accent-indigo)', marginBottom: '40px', fontSize: '14px' }}>GRAMMAR_INTEL</h3>
+         
+         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="glass-panel" style={{ borderLeft: '3px solid var(--accent-indigo)', padding: '24px' }}>
+               <span className="mono" style={{ fontSize: '10px', color: 'var(--accent-indigo)', fontWeight: 600 }}>CORRECTION</span>
+               <h4 style={{ fontSize: '20px', marginTop: '12px' }}>Mis planes</h4>
+               <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.5, fontWeight: 300 }}>Gender agreement confirmed. Correct possessive adjective usage.</p>
             </div>
-         ) : (
-            <>
-               <div className="privacy-card-title">SESSION INTELLIGENCE</div>
-               
-               <div className="ai-summary-card-v2" style={{ marginBottom: '24px' }}>
-                  <div className="neural-header">
-                     <div className="neural-icon">🎓</div>
-                     <div>
-                        <h4>Grammar Tip</h4>
-                        <span>CONTEXTUAL LEARNING</span>
-                     </div>
-                  </div>
-                  <p style={{ fontSize: '13px', color: '#94a3b8' }}>Note the use of <b>"hace"</b> vs <b>"desde hace"</b> for duration in Spanish. You used it correctly in your last sentence!</p>
-               </div>
 
-               <div className="privacy-card-title" style={{ marginTop: '40px' }}>PROFICIENCY GROWTH</div>
-               <div className="pulse-metric-row">
-                  <div className="pulse-metric-item">
-                     <div className="pulse-metric-label">
-                        <h4>Vocabulary Count</h4>
-                        <p>Total unique words used</p>
-                     </div>
-                     <div className="pulse-metric-value">842</div>
-                  </div>
-                  <div className="pulse-metric-item">
-                     <div className="pulse-metric-label">
-                        <h4>Grammar Score</h4>
-                        <p>Based on latest responses</p>
-                     </div>
-                     <div className="pulse-metric-value" style={{ color: '#a78bfa' }}>88%</div>
-                  </div>
-               </div>
+            <div className="glass-panel" style={{ borderLeft: '3px solid var(--accent-soft)', padding: '24px' }}>
+               <span className="mono" style={{ fontSize: '10px', color: 'var(--accent-soft)', fontWeight: 600 }}>VOCAB_UPGRADE</span>
+               <h4 style={{ fontSize: '20px', marginTop: '12px' }}>Proyectos</h4>
+               <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '8px', fontWeight: 300 }}>Consider 'proyectos' for formal professional contexts.</p>
+            </div>
+         </div>
 
-               <div style={{ marginTop: '40px' }}>
-                  <button className="btn btn-outline" style={{ width: '100%', padding: '14px' }}>View Detailed Report</button>
-               </div>
-            </>
-         )}
+         <div style={{ marginTop: 'auto', paddingTop: '32px', borderTop: '1px solid var(--border-ghost)' }}>
+            <span className="mono" style={{ fontSize: '10px', opacity: 0.4 }}>FLUENCY_STATUS</span>
+            <div style={{ fontSize: '32px', fontWeight: 600, marginTop: '8px' }}>88% <span className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ACCURACY</span></div>
+         </div>
       </aside>
     </div>
   );
