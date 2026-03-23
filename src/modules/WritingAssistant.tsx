@@ -9,7 +9,6 @@ import {
   detectFillerWords,
 } from '../lib/ai-utils';
 import { api } from '../lib/api';
-import { Button, Input, TextArea, Select, Badge, Toast, Card } from '../components/UI';
 
 interface Draft {
   _id: string;
@@ -46,11 +45,9 @@ export function WritingAssistant() {
   const [selectedTone, setSelectedTone] = useState('formal');
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingText, setStreamingText] = useState('');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   
   const { state: modelState, ensure: ensureModel } = useModelLoader(ModelCategory.Language);
 
-  // Metrics
   const words = countWords(content);
   const readability = Math.round(calculateReadabilityScore(content));
   const passiveCount = detectPassiveVoice(content).length;
@@ -73,7 +70,6 @@ export function WritingAssistant() {
       }
     } catch (err) {
       console.error('Failed to load drafts:', err);
-      setToast({ message: 'Failed to load documents', type: 'error' });
     }
   };
 
@@ -89,16 +85,13 @@ export function WritingAssistant() {
 
       if (activeDraft?._id) {
         await api.put(`/writing/${activeDraft._id}`, data);
-        setToast({ message: 'Document saved successfully', type: 'success' });
       } else {
         const newDraft = await api.post('/writing', data);
         setActiveDraft(newDraft);
-        setToast({ message: 'Document created successfully', type: 'success' });
       }
       loadDrafts();
     } catch (err) {
       console.error('Save failed:', err);
-      setToast({ message: 'Failed to save document', type: 'error' });
     }
   };
 
@@ -150,11 +143,8 @@ export function WritingAssistant() {
       } else {
         setContent(result.text);
       }
-      
-      setToast({ message: 'AI generation complete', type: 'success' });
     } catch (err) {
       console.error('AI action failed:', err);
-      setToast({ message: 'AI generation failed. Make sure models are loaded.', type: 'error' });
     } finally {
       setIsGenerating(false);
       setStreamingText('');
@@ -176,210 +166,132 @@ export function WritingAssistant() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 320px', height: 'calc(100vh - 72px)', background: 'var(--bg-midnight)' }}>
-      {/* Sidebar */}
-      <aside style={{ borderRight: '1px solid var(--border-ghost)', padding: '32px 24px', overflowY: 'auto' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <span className="mono" style={{ fontSize: '10px', color: 'var(--accent-indigo)' }}>WRITING_MODULE</span>
-          <h3 style={{ fontSize: '20px', fontWeight: 600, marginTop: '8px' }}>Cognitive Drafting</h3>
-          <Badge variant={modelState === 'ready' ? 'success' : 'warning'} style={{ marginTop: '12px' }}>
-            AI: {modelState.toUpperCase()}
-          </Badge>
+    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 280px', height: '100%', background: 'var(--bg-app)' }}>
+      {/* List Sidebar */}
+      <aside style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-app)' }}>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '18px' }}>Documents</h3>
+            <button onClick={handleNewDocument} className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '13px' }}>+ New</button>
+          </div>
+          <div style={{ fontSize: '11px', color: modelState === 'ready' ? 'var(--success)' : 'var(--warning)', marginBottom: '16px', fontWeight: 600 }}>
+             AI Status: {modelState === 'ready' ? 'Online' : 'Loading...'}
+          </div>
         </div>
 
-        <Button variant="primary" size="md" style={{ width: '100%', marginBottom: '24px' }} onClick={handleNewDocument}>
-          + New Document
-        </Button>
-
-        <div>
-          <span className="mono" style={{ fontSize: '9px', opacity: 0.4, display: 'block', marginBottom: '12px' }}>
-            YOUR_DOCUMENTS
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {drafts.map(draft => (
-              <Card
-                key={draft._id}
-                hoverable
-                onClick={() => handleSelectDraft(draft)}
-                style={{
-                  padding: '12px 16px',
-                  background: activeDraft?._id === draft._id ? 'var(--accent-glow)' : 'var(--bg-surface)',
-                  border: activeDraft?._id === draft._id ? '1px solid var(--accent-indigo)' : '1px solid var(--border-ghost)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>
-                  {draft.title}
-                </div>
-                <div className="mono" style={{ fontSize: '9px', color: 'var(--text-dim)' }}>
-                  {draft.wordCount || 0} words • {draft.mode}
-                </div>
-              </Card>
-            ))}
-          </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 24px' }}>
+          {drafts.map(draft => (
+            <div 
+              key={draft._id}
+              onClick={() => handleSelectDraft(draft)}
+              className="card card-interactive"
+              style={{ 
+                padding: '16px', 
+                marginBottom: '8px',
+                background: activeDraft?._id === draft._id ? 'var(--bg-hover)' : 'transparent',
+                borderColor: activeDraft?._id === draft._id ? 'var(--accent)' : 'var(--border)'
+              }}
+            >
+              <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>{draft.title || 'Untitled'}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                {draft.wordCount || 0} words • {draft.mode}
+              </div>
+            </div>
+          ))}
         </div>
       </aside>
 
-      {/* Main Editor */}
-      <main style={{ padding: '32px', overflowY: 'auto' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Document title..."
-            style={{ fontSize: '24px', fontWeight: 600, border: 'none', background: 'transparent', padding: '0 0 16px 0', marginBottom: '24px' }}
-          />
-
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-            <Select
-              label="MODE"
-              options={MODES}
-              value={selectedMode}
-              onChange={(e) => setSelectedMode(e.target.value)}
-            />
-            <Select
-              label="TONE"
-              options={TONES}
-              value={selectedTone}
-              onChange={(e) => setSelectedTone(e.target.value)}
+      {/* Editor Area */}
+      <main style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-app)' }}>
+        <header style={{ padding: '24px 40px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ flex: 1, marginRight: '24px' }}>
+            <input 
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Document title..."
+              style={{ background: 'none', border: 'none', fontSize: '24px', fontWeight: 600, padding: '0', width: '100%' }}
             />
           </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+             <button onClick={handleSave} className="btn btn-primary">Save Document</button>
+          </div>
+        </header>
 
-          <TextArea
+        <div style={{ padding: '16px 40px', background: 'var(--bg-light)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '16px' }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Format</span>
+              <select 
+                value={selectedMode} 
+                onChange={(e) => setSelectedMode(e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '12px' }}
+              >
+                {MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+           </div>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Tone</span>
+              <select 
+                value={selectedTone} 
+                onChange={(e) => setSelectedTone(e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '12px' }}
+              >
+                {TONES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+           </div>
+        </div>
+
+        <div style={{ flex: 1, padding: '40px', position: 'relative' }}>
+          <textarea 
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Start writing your masterpiece..."
-            style={{ 
-              minHeight: '400px', 
-              fontSize: '16px', 
-              lineHeight: '1.8',
-              border: '1px solid var(--border-ghost)',
-              background: 'var(--bg-deep)',
-            }}
+            placeholder="Start writing..."
+            style={{ width: '100%', height: '100%', background: 'none', border: 'none', fontSize: '16px', lineHeight: '1.8', resize: 'none' }}
           />
 
           {streamingText && (
-            <div style={{ 
-              marginTop: '16px', 
-              padding: '16px', 
-              background: 'var(--accent-glow)', 
-              border: '1px solid var(--accent-indigo)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '14px',
-              lineHeight: '1.6',
-            }}>
-              <div className="mono" style={{ fontSize: '10px', marginBottom: '8px', color: 'var(--accent-indigo)' }}>
-                AI_GENERATING...
-              </div>
-              {streamingText}
+            <div className="card animate-in" style={{ position: 'absolute', bottom: '40px', left: '40px', right: '40px', padding: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', background: 'var(--bg' }}>
+               <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '8px' }}>AI IS THINKING...</div>
+               <div style={{ fontSize: '14px', lineHeight: '1.6' }}>{streamingText}</div>
             </div>
           )}
-
-          <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <Button variant="primary" onClick={handleSave} disabled={isGenerating}>
-              Save Document
-            </Button>
-            <Button variant="secondary" onClick={() => handleAIAction('improve')} disabled={isGenerating || !content} loading={isGenerating}>
-              Improve Writing
-            </Button>
-            <Button variant="secondary" onClick={() => handleAIAction('transform-tone')} disabled={isGenerating || !content} loading={isGenerating}>
-              Transform Tone
-            </Button>
-            <Button variant="ghost" onClick={() => handleAIAction('continue')} disabled={isGenerating || !content} loading={isGenerating}>
-              Continue Writing
-            </Button>
-          </div>
         </div>
+
+        <footer style={{ padding: '24px 40px', borderTop: '1px solid var(--border)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+           <button onClick={() => handleAIAction('improve')} className="btn btn-secondary" disabled={isGenerating || !content}>Improve Clarity</button>
+           <button onClick={() => handleAIAction('transform-tone')} className="btn btn-secondary" disabled={isGenerating || !content}>Shift Tone</button>
+           <button onClick={() => handleAIAction('continue')} className="btn btn-ghost" disabled={isGenerating || !content}>Continue Text</button>
+        </footer>
       </main>
 
-      {/* Right Panel: Metrics & Actions */}
-      <aside style={{ borderLeft: '1px solid var(--border-ghost)', padding: '32px 24px', overflowY: 'auto' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <span className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block', marginBottom: '16px' }}>
-            METRICS
-          </span>
-          
-          <Card style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--accent-indigo)' }}>{words}</div>
-            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>WORD_COUNT</div>
-          </Card>
+      {/* Metrics Sidebar */}
+      <aside style={{ borderLeft: '1px solid var(--border)', padding: '24px', background: 'var(--bg-app)' }}>
+        <h3 style={{ fontSize: '14px', color: 'var(--text-dim)', marginBottom: '24px' }}>Analysis</h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 700 }}>{words}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Words</div>
+          </div>
 
-          <Card style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, color: readability >= 60 ? '#22c55e' : readability >= 40 ? '#fb923c' : '#ef4444' }}>
-              {readability}
-            </div>
-            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>READABILITY_SCORE</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-              {readability >= 60 ? 'Easy to read' : readability >= 40 ? 'Moderate' : 'Difficult'}
-            </div>
-          </Card>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 700, color: readability >= 60 ? 'var(--success)' : 'var(--warning)' }}>{readability}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '4px' }}>Readability</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{readability >= 60 ? 'Clear & simple' : 'Professional'}</div>
+          </div>
 
-          <Card style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, color: passiveCount === 0 ? '#22c55e' : passiveCount < 3 ? '#fb923c' : '#ef4444' }}>
-              {passiveCount}
-            </div>
-            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>PASSIVE_VOICE</div>
-          </Card>
-
-          {fillerWords.length > 0 && (
-            <Card>
-              <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                FILLER_WORDS
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {fillerWords.slice(0, 5).map(fw => (
-                  <Badge key={fw.word} variant="warning">
-                    {fw.word}: {fw.count}
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-
-        <div>
-          <span className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'block', marginBottom: '16px' }}>
-            AI_ACTIONS
-          </span>
-          
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            style={{ width: '100%', marginBottom: '8px' }}
-            onClick={() => handleAIAction('summarize')}
-            disabled={isGenerating || !content}
-            loading={isGenerating}
-          >
-            Summarize
-          </Button>
-          
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            style={{ width: '100%', marginBottom: '8px' }}
-            onClick={() => handleAIAction('expand')}
-            disabled={isGenerating || !content}
-            loading={isGenerating}
-          >
-            Expand Text
-          </Button>
-
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            style={{ width: '100%' }}
-            onClick={() => {
-              navigator.clipboard.writeText(content);
-              setToast({ message: 'Copied to clipboard', type: 'success' });
-            }}
-            disabled={!content}
-          >
-            Copy to Clipboard
-          </Button>
+          <div className="card" style={{ padding: '16px' }}>
+             <h4 style={{ fontSize: '12px', marginBottom: '12px' }}>AI Actions</h4>
+             <button onClick={() => handleAIAction('summarize')} className="btn btn-secondary" style={{ width: '100%', marginBottom: '8px', fontSize: '12px' }} disabled={isGenerating || !content}>Summarize</button>
+             <button onClick={() => handleAIAction('expand')} className="btn btn-secondary" style={{ width: '100%', marginBottom: '8px', fontSize: '12px' }} disabled={isGenerating || !content}>Expand</button>
+             <button 
+                onClick={() => { navigator.clipboard.writeText(content); }} 
+                className="btn btn-ghost" 
+                style={{ width: '100%', fontSize: '12px' }}
+                disabled={!content}
+             >Copy to Clipboard</button>
+          </div>
         </div>
       </aside>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

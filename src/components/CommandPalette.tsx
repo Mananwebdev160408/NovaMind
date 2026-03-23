@@ -25,37 +25,16 @@ export function CommandPalette({ isOpen, onClose, modules = {} }: CommandPalette
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // Build command list
   const commands: CommandItem[] = [
-    // Navigation
-    { id: 'nav-dashboard', name: 'Go to Dashboard', description: 'Main dashboard view', category: 'Navigation', action: () => navigate('/dashboard') },
-    { id: 'nav-writing', name: 'Writing Assistant', description: 'AI-powered writing environment', category: 'Navigation', action: () => navigate('/dashboard/writing'), icon: '✍️' },
-    { id: 'nav-notes', name: 'Notes', description: 'Intelligent note-taking', category: 'Navigation', action: () => navigate('/dashboard/notes'), icon: '📝' },
-    { id: 'nav-docs', name: 'Document Research', description: 'Analyze documents & PDFs', category: 'Navigation', action: () => navigate('/dashboard/research'), icon: '📄' },
-    { id: 'nav-meetings', name: 'Meeting Transcription', description: 'Record and transcribe meetings', category: 'Navigation', action: () => navigate('/dashboard/meetings'), icon: '🎙️' },
-    { id: 'nav-language', name: 'Language Learning', description: 'Practice pronunciation', category: 'Navigation', action: () => navigate('/dashboard/language'), icon: '🌍' },
-    { id: 'nav-code', name: 'Code Engine', description: 'Document and analyze code', category: 'Navigation', action: () => navigate('/dashboard/code'), icon: '💻' },
-    { id: 'nav-graph', name: 'Knowledge Graph', description: 'Visualize connections', category: 'Navigation', action: () => navigate('/dashboard/graph'), icon: '🕸️' },
-    { id: 'nav-privacy', name: 'Privacy Dashboard', description: 'Monitor data & encryption', category: 'Navigation', action: () => navigate('/dashboard/privacy'), icon: '🔒' },
-
-    // Actions
-    { id: 'action-new-note', name: 'New Note', description: 'Create a new note', category: 'Actions', action: () => { navigate('/dashboard/notes'); setTimeout(() => { /* trigger new note */ }, 100); }, shortcut: '⌘N' },
-    { id: 'action-new-doc', name: 'New Writing Document', description: 'Start a new draft', category: 'Actions', action: () => { navigate('/dashboard/writing'); setTimeout(() => { /* trigger new doc */ }, 100); } },
-    { id: 'action-upload-pdf', name: 'Upload Document', description: 'Upload PDF or text file', category: 'Actions', action: () => { navigate('/dashboard/research'); setTimeout(() => { /* trigger upload */ }, 100); } },
-    { id: 'action-start-recording', name: 'Start Recording', description: 'Begin meeting transcription', category: 'Actions', action: () => { navigate('/dashboard/meetings'); setTimeout(() => { /* start recording */ }, 100); } },
-    { id: 'action-practice-language', name: 'Practice Language', description: 'Start pronunciation practice', category: 'Actions', action: () => { navigate('/dashboard/language'); setTimeout(() => { /* start practice */ }, 100); } },
-
-    // Settings
-    { id: 'settings-theme', name: 'Toggle Theme', description: 'Switch between dark/light mode', category: 'Settings', action: () => { /* toggle theme */ } },
-    { id: 'settings-profile', name: 'Edit Profile', description: 'Update your profile', category: 'Settings', action: () => { /* open profile modal */ } },
-    { id: 'settings-preferences', name: 'Preferences', description: 'Configure app settings', category: 'Settings', action: () => { /* open preferences */ } },
-
-    // Help
-    { id: 'help-docs', name: 'Documentation', description: 'View documentation', category: 'Help', action: () => window.open('https://docs.runanywhere.ai/', '_blank') },
-    { id: 'help-shortcuts', name: 'Keyboard Shortcuts', description: 'View all shortcuts', category: 'Help', action: () => { /* show shortcuts modal */ } },
+    { id: 'nav-dashboard', name: 'Go to Dashboard', description: 'Main overview', category: 'Navigation', action: () => navigate('/dashboard') },
+    { id: 'nav-writing', name: 'Writing Assistant', description: 'AI-powered writing', category: 'Navigation', action: () => navigate('/dashboard/writing'), icon: '✍️' },
+    { id: 'nav-notes', name: 'Notes', description: 'Note-taking module', category: 'Navigation', action: () => navigate('/dashboard/notes'), icon: '📝' },
+    { id: 'nav-docs', name: 'Document Analysis', description: 'Analyze documents', category: 'Navigation', action: () => navigate('/dashboard/research'), icon: '📄' },
+    { id: 'action-new-note', name: 'New Note', description: 'Create a new note', category: 'Actions', action: () => { navigate('/dashboard/notes'); }, shortcut: '⌘N' },
+    { id: 'action-new-doc', name: 'New Writing Document', description: 'Start a new draft', category: 'Actions', action: () => { navigate('/dashboard/writing'); } },
+    { id: 'settings-profile', name: 'View Profile', description: 'Your account details', category: 'Settings', action: () => { navigate('/dashboard/profile'); } },
   ];
 
-  // Fuse.js configuration
   const fuse = new Fuse(commands, {
     keys: ['name', 'description', 'category'],
     threshold: 0.3,
@@ -105,13 +84,13 @@ export function CommandPalette({ isOpen, onClose, modules = {} }: CommandPalette
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(8px)',
+        background: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '20vh 24px 24px'
+        padding: '15vh 24px 24px'
       }}
       onClick={onClose}
     >
@@ -119,44 +98,42 @@ export function CommandPalette({ isOpen, onClose, modules = {} }: CommandPalette
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '640px',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-thin)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.5)',
+          maxWidth: '600px',
+          background: 'var(--bg-app)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.2)',
           overflow: 'hidden'
         }}
       >
-        {/* Search Input */}
-        <div style={{ padding: '24px', borderBottom: '1px solid var(--border-ghost)' }}>
+        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search..."
+            placeholder="Search commands..."
             style={{
               width: '100%',
-              background: 'var(--bg-obsidian)',
-              border: '1px solid var(--border-thin)',
-              padding: '16px',
+              background: 'var(--bg-light)',
+              border: '1px solid var(--border)',
+              padding: '12px 16px',
               fontSize: '16px',
-              color: 'var(--text-primary)',
+              color: 'var(--text-main)',
               outline: 'none',
-              borderRadius: 'var(--radius-sm)'
+              borderRadius: '8px'
             }}
           />
-          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '12px' }}>
-            ↑↓ Navigate • ↵ Select • ESC Dismiss
+          <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '12px' }}>
+            ↑↓ to navigate • Enter to select • Esc to close
           </div>
         </div>
 
-        {/* Results */}
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
           {results.length === 0 ? (
-            <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <span className="mono" style={{ fontSize: '10px' }}>NO_RESULTS_FOUND</span>
+            <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-dim)' }}>
+              No commands found.
             </div>
           ) : (
             results.map((item, idx) => (
@@ -165,41 +142,24 @@ export function CommandPalette({ isOpen, onClose, modules = {} }: CommandPalette
                 onClick={() => { item.action(); onClose(); }}
                 style={{
                   width: '100%',
-                  padding: '16px 24px',
-                  background: idx === selected ? 'var(--bg-obsidian)' : 'transparent',
+                  padding: '14px 24px',
+                  background: idx === selected ? 'var(--bg-hover)' : 'transparent',
                   border: 'none',
-                  borderBottom: '1px solid var(--border-ghost)',
+                  borderBottom: '1px solid var(--border)',
                   textAlign: 'left',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '16px',
-                  transition: 'background 0.15s'
+                  gap: '12px',
                 }}
               >
-                {item.icon && (
-                  <span style={{ fontSize: '24px', minWidth: '24px' }}>{item.icon}</span>
-                )}
+                {item.icon && <span style={{ fontSize: '20px' }}>{item.icon}</span>}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    {item.name}
-                  </div>
-                  <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                    {item.description}
-                  </div>
-                </div>
-                <div className="mono" style={{ fontSize: '9px', color: 'var(--text-dim)', opacity: 0.5 }}>
-                  {item.category}
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>{item.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{item.description}</div>
                 </div>
                 {item.shortcut && (
-                  <div className="mono" style={{ 
-                    fontSize: '10px', 
-                    color: 'var(--text-dim)', 
-                    padding: '4px 8px', 
-                    background: 'var(--bg-midnight)',
-                    border: '1px solid var(--border-ghost)',
-                    borderRadius: '4px'
-                  }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', padding: '2px 6px', background: 'var(--bg-light)', border: '1px solid var(--border)', borderRadius: '4px' }}>
                     {item.shortcut}
                   </div>
                 )}
@@ -208,9 +168,9 @@ export function CommandPalette({ isOpen, onClose, modules = {} }: CommandPalette
           )}
         </div>
 
-        <div style={{ padding: '16px 24px', background: 'var(--bg-midnight)', borderTop: '1px solid var(--border-ghost)' }}>
-          <div className="mono" style={{ fontSize: '9px', color: 'var(--text-dim)', textAlign: 'center' }}>
-            NEURAL_COMMAND_INTERFACE_v2.1 • {results.length} {results.length === 1 ? 'RESULT' : 'RESULTS'}
+        <div style={{ padding: '12px 24px', background: 'var(--bg-light)', borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'center' }}>
+            {results.length} commands available
           </div>
         </div>
       </div>
